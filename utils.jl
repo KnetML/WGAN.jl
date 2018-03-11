@@ -1,12 +1,11 @@
 using FileIO, Images
 
-# TODO: Parallelization
-function readimgs(imgdirs::Vector{String}, size...)
+function readimgs(imgdirs::Vector{String}, height, width)
     imgs = []
-    for imgdir in imgdirs
-        append!(imgs, imresize(load(imgdir), size))
+    imgs = @parallel (vcat) for i = 1:length(imgdirs)
+        Images.imresize(FileIO.load(imgdirs[i]), height, width)
     end
-    return imgs
+    return v
 end
 
 function getimgdirs(dir::String, extension::String)
