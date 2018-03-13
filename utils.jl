@@ -1,21 +1,26 @@
-using FileIO, Images
+using FileIO, Images, ImageCore
 
-function readimgs(imgdirs::Vector{String}, height, width)
-    imgs = []
-    imgs = @parallel (vcat) for i = 1:length(imgdirs)
-        Images.imresize(FileIO.load(imgdirs[i]), height, width)
+@everywhere function readimg(dir, width, height, atype)
+    img = Images.imresize(FileIO.load(dir), width, height)
+    img = atype.(Images.rawview(ImageCore.channelview(img)[1:3, :, :]))
+    img = permutedims(img, (2,3,1)) ./ 255
+    return reshape(img, 1, width, height, 3)
+end
+
+function readimgs(basedir::String, num::Int;
+                  extension=".webp", width=64, height=64, atype=Float32)
+    imgdirs = readdir(basedir)
+    if num == -1
+        num = length(imgdirs)
     end
-    return v
+    imgs = @parallel vcat for i = 1:num
+        if contains(imgdirs[i], extension)
+            imgdir = joinpath(basedir, imgdirs[i])
+            readimg(imgdir, width, height, atype)
+        end
+    end
+    return imgs
 end
 
-function getimgdirs(dir::String, extension::String)
-    imgs = filter(x->contains(x,extension), readdir(dir))
-    imgdirs = map(x->joinpath(dir, x), imgs)
-    return imgdirs
-end
-
-println("Getting dirs")
-imgdirs = getimgdirs("/home/cem/bedroom/train", ".webp")
-
-println("Reading images")
-@time readimgs(imgdirs, 64, 64)
+@time myimgs = readimgs("/home/cem/bedroom/train", 1024)
+println(size(myimgs))
