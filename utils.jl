@@ -1,8 +1,13 @@
-using FileIO, Images, ImageCore
+using FileIO, Images, ImageCore, JLD
 
 @everywhere function readimg(dir, width, height, atype)
     img = Images.imresize(FileIO.load(dir), width, height)
     img = atype.(Images.rawview(ImageCore.channelview(img)[1:3, :, :]))
+    if length(img) != 3*width*height
+        println(dir)
+        rm(dir)
+        return randn(1, 64, 64, 3)
+    end
     img = permutedims(img, (2,3,1)) ./ 255
     return reshape(img, 1, width, height, 3)
 end
@@ -22,5 +27,48 @@ function readimgs(basedir::String, num::Int;
     return imgs
 end
 
-@time myimgs = readimgs("/home/cem/bedroom/train", 1024)
+function samplenoise4(atype, size, n)
+    return atype(reshape(randn(size, n), 1, 1))
+end
+
+@everywhere function savetensor(tensor, filepath; name="tensor")
+    JLD.jldopen(filepath, "w") do file
+        write(file, name, tensor)
+    end
+end
+
+function saveimgtensors(basedir, imgs, bsize)
+    for k = 1:bsize:size(imgs, 1)
+        lo = k
+        hi = min(k+bsize-1, size(imgs, 1))
+        tensor = imgs[lo:hi,:,:,:]
+        println(size(tensor))
+        bid = Int(floor(k/bsize))
+        filepath = joinpath(basedir, string(bid))*".jld"
+        savetensor(tensor, filepath)
+    end
+end
+
+@everywhere function loadtensor(filepath; name="tensor")
+    JLD.jldopen(filepath, "r") do file
+        read(file, name)
+    end
+end
+
+function loadimgtensors(basedir)
+    tensordirs = readdir(basedir)
+    imgs = @parallel vcat for dir in tensordirs
+        loadtensor(joinpath(basedir, dir))
+    end
+end
+
+println("Reading dataset")
+@time myimgs = readimgs("/home/cem/bedroom_train", 4096)
 println(size(myimgs))
+
+#println("Save dataset")
+#@time saveimgtensors("/home/cem/bedroom", myimgs, 100000)
+
+#println("Load processed dataset")
+#@time loadedimgs = loadimgtensors("/home/cem/bedroom")
+#println(size(loadedimgs))
