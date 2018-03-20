@@ -24,11 +24,11 @@ function dense(insize, outsize; activation=nothing, initializer=xavier, bias=tru
     return w, b, forward
 end
 
-function sequential(atype, layers...)
+function sequential(layers...)
     """
     `layers...` are the layers implemented in the `layers.jl` file. This layers
     returns 3-element tuples containing weight, bias and the forward pass functions.
-    This method returns a tuple, first element is array of `atype` and second element
+    This method returns a tuple, first element is array parameters and second element
     is a function that takes inputs `x` and passes x through the network.
     """
     ws = Array{Any}
