@@ -27,6 +27,7 @@ function dcganmlp()
         )
     end
     return generator, discriminator
+end
 
 function dcgan()
     function generator(zsize)
