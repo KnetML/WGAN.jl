@@ -8,6 +8,7 @@ using FileIO, Images, ImageCore, JLD
     #     rm(dir)
     #     return randn(1, 64, 64, 3)
     # end
+    # TODO: Normalize between (-1, 1)
     img = permutedims(img, (2,3,1)) ./ 255
     return reshape(img, 1, width, height, 3)
 end
@@ -28,7 +29,10 @@ function readimgs(basedir::String, num::Int;
 end
 
 function samplenoise4(size, n, atype)
-    return atype(reshape(randn(n, size), n, 1, 1, size))
+    """
+    Outputs gaussian noise with size (1, 1, size, n)
+    """
+    return atype(reshape(randn(size, n), 1, 1, size, n))
 end
 
 @everywhere function savetensor(tensor, filepath; name="tensor")
@@ -63,10 +67,16 @@ function loadimgtensors(basedir)
 end
 
 function minibatch4(X, batchsize, atype)
+    """
+    Size of X is (N, w, h, c)
+    Outputs array where each element has size (w, h, c, b)
+    """
     data = Any[]
     for i=1:batchsize:size(X, 1)
         limit = min(i+batchsize-1, size(X, 1))
-        push!(data, atype(X[i:limit, :, :, :]))
+        minibatch = X[i:limit, :, :, :]
+        per = permutedims(minibatch, [2, 3, 4, 1]) # Examples are last element
+        push!(data, atype(per))
     end
     return data
 end

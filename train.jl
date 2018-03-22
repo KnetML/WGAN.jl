@@ -1,6 +1,8 @@
 include("models.jl")
 include("utils.jl")
-using Knet, ArgParse
+using Knet, ArgParse, FileIO, Images
+include(Pkg.dir("Knet","data","imagenet.jl"))
+
 
 function main(args)
     s = ArgParseSettings()
@@ -57,17 +59,31 @@ function main(args)
     info("Generator # of Parameters: $gnumparam")
     info("Discriminator # of Parameters: $dnumparam")
 
+    # TODO: Make a function for this
+    randz = samplenoise4(zsize, 25, atype)
+    genimgs = Array(generator_forward(randz)) .* 255
+
+    images = map(i->reshape(genimgs[:,:,:,i], (64, 64, 3)), 1:25)
+    grid = make_image_grid(images; gridsize=(5, 5), scale=1.0)
+
+    outfile = "rand.png"
+    save(outfile, colorview(RGB, grid))
+    # End of temporary stuff
+
     batches = minibatch4(data, batchsize, atype)
 
     info("Started Training...")
-    #for epoch in 1:numepoch
-    #    for minibatch in batches
+    for epoch in 1:numepoch
+        for minibatch in batches
             z = samplenoise4(zsize, batchsize, atype)
             gen = generator_forward(z)
-            dis = discriminator_forward(minibatch)
-    #    end
-    # end
+            dis = discriminator_forward(batches[1])
+            # TODO: Loss metrics and parameter update
+       end
+    end
 
+    info("Done. Exiting...")
+    return 0
 end
 
 main("--usegpu")

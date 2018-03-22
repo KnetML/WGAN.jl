@@ -12,7 +12,7 @@ function mlpgan(zsize, atype)
             dense(512, 512, activation=relu),
             dense(512, 512, activation=relu),
             dense(512, 512, activation=relu),
-            dense(512, 64*64*3, activation=relu)
+            dense(512, 64*64*3, activation=tanh)
         )
 
     # Input size: (64,64,3)
@@ -20,7 +20,7 @@ function mlpgan(zsize, atype)
     discriminator =
         sequential(
             atype,
-            conv2d(zsize, 64, 4, stride=2, padding=1), # (32,32,64)
+            conv2d(3, 64, 4, stride=2, padding=1), # (32,32,64)
             conv2d(64, 128, 4, stride=2, padding=1), # (16,16,128)
             conv2d(128, 256, 4, stride=2, padding=1), # (8,8,256)
             conv2d(256, 512, 4, stride=2, padding=1), # (4,4,512)
@@ -47,7 +47,7 @@ function dcgan(zsize, atype)
     discriminator =
         sequential(
             atype,
-            conv2d(zsize, 64, 4, stride=2, padding=1), # (32,32,64)
+            conv2d(3, 64, 4, stride=2, padding=1), # (32,32,64)
             conv2d(64, 128, 4, stride=2, padding=1), # (16,16,128)
             conv2d(128, 256, 4, stride=2, padding=1), # (8,8,256)
             conv2d(256, 512, 4, stride=2, padding=1), # (4,4,512)

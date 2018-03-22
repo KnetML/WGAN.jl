@@ -2,10 +2,10 @@ using Knet
 
 function conv2d(inchannel, outchannel, kernelsize; stride=1, padding=0,
                 activation=relu, transposed=false)
-    wsize = transposed ? (kernelsize, kernelsize, inchannel, outchannel) : (kernelsize, kernelsize, outchannel, inchannel)
-    bsize = (outchannel, 1)
+    wsize = transposed ? (kernelsize, kernelsize, outchannel, inchannel) : (kernelsize, kernelsize, inchannel, outchannel)
+    bsize = (1, 1, outchannel, 1)
     function forward(x, w, b)
-        x = transposed ? deconv4(x, w, padding=padding, stride=stride) : conv4(x, w, padding=padding, stride=stride)
+        x = transposed ? deconv4(w, x, padding=padding, stride=stride) : conv4(w, x, padding=padding, stride=stride)
         x = x .+ b
         activation != nothing ? activation.(x) : x
     end
@@ -17,14 +17,14 @@ function dense(insize, outsize; activation=nothing)
     bsize = (outsize, 1)
     function forward(x, w, b)
         if length(size(x)) != 2 x=mat(x) end
-        x = w*x
+        x = w * x
         x = x .+ b
         activation != nothing ? activation.(x) : x
     end
     return wsize, bsize, forward
 end
 
-function sequential(atype, layers...; initializer=xavier)
+function sequential(atype, layers...; winit=xavier, binit=zeros)
     """
     `layers...` are the layers implemented in the `layers.jl` file. This layers
     returns 3-element tuples containing weight size, bias size and the forward pass functions.
@@ -36,16 +36,18 @@ function sequential(atype, layers...; initializer=xavier)
     forws = Any[]
 
     for l in layers
-        push!(ws, initializer(l[1])) # Init the weight
-        push!(ws, initializer(l[2])) # Init the bias
+        push!(ws, winit(l[1])) # Init the weight
+        push!(ws, binit(l[2])) # Init the bias
         push!(forws, l[3]) # Layer forward
     end
 
-    map(atype, ws)
-    println(typeof(ws))
+    ws = map(atype, ws)
+
     function forward(x)
-        for (idx, f) in enumerate(forws)
-            x = f(x, ws[idx], ws[idx+1])
+        i = 1
+        for f in forws
+            x = f(x, ws[i], ws[i+1])
+            i += 2
         end
         return x
     end
