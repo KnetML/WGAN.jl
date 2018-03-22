@@ -27,8 +27,8 @@ function readimgs(basedir::String, num::Int;
     return imgs
 end
 
-function samplenoise4(atype, size, n)
-    return reshape(randn(size, n), n, 1, 1, size)
+function samplenoise4(size, n, atype)
+    return atype(reshape(randn(n, size), n, 1, 1, size))
 end
 
 @everywhere function savetensor(tensor, filepath; name="tensor")
@@ -62,13 +62,21 @@ function loadimgtensors(basedir)
     end
 end
 
-function minibatch4(X, batchsize)
+function minibatch4(X, batchsize, atype)
     data = Any[]
     for i=1:batchsize:size(X, 1)
         limit = min(i+batchsize-1, size(X, 1))
-        push!(data, X[i:limit, :, :, :])
+        push!(data, atype(X[i:limit, :, :, :]))
     end
     return data
+end
+
+function numparams(paramarr)
+    count = 0
+    for p in paramarr
+        count += length(p)
+    end
+    return count
 end
 
 # Test stuff

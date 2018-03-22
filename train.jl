@@ -8,29 +8,66 @@ function main(args)
 
     @add_arg_table s begin
         ("--usegpu"; action=:store_true; help="use GPU or not")
-        ("--embed"; arg_type=Int; default=128; help="word embedding size")
-        ("--hidden"; arg_type=Int; default=50; help="LSTM hidden size")
-        # ("--mlp"; arg_type=bool; default=false; help="MLP size")
-        ("--epochs"; arg_type=Int; default=20; help="number of training epochs")
-        ("--report"; arg_type=Int; default=500; help="report period in iters")
-        ("--valid"; arg_type=Int; default=10000; help="valid period in iters")
-        ("--batchsize"; arg_type=Int; default=100; help="batchsize")
+        ("--bn"; action=:store_true; help="Use batchnorm in generator")
+        ("--mlp"; action=:store_true; help="Use 4 layer MLP as generator")
+        ("--procedure"; arg_type=String; default="gan"; help="Training procedure. gan or wgan")
+        ("--zsize"; arg_type=Int; default=100; help="Noise vector dimension")
+        ("--epochs"; arg_type=Int; default=20; help="Number of training epochs")
+        ("--report"; arg_type=Int; default=500; help="Report loss in n iterations")
+        ("--batchsize"; arg_type=Int; default=128; help="batchsize")
     end
 
     isa(args, AbstractString) && (args=split(args))
     o = parse_args(args, s; as_symbols=true)
 
     atype = o[:usegpu] ? KnetArray{Float32} : Array{Float32}
+
     batchsize = o[:batchsize]
+    procedure = o[:procedure]
+    ismlp = o[:mlp]
+    isbn = o[:bn]
+    zsize = o[:zsize]
+    numepoch = o[:epochs]
+
+    generatortype = ismlp ? "MLP " : "DCGAN "
+    generatortype *= isbn ? "BN" : "No BN"
 
     info("Minibatch Size: $batchsize")
+    info("Training Procedure: $procedure")
+    info("Generator Type: $generatortype")
+    info("Noise size: $zsize")
+    info("Number of epochs: $numepoch")
+
+    o[:usegpu] ? info("Using GPU") : info("Not using GPU (why)")
+
     info("Loading dataset")
 
     data = loadimgtensors("/home/cem/bedroom")
-    batches = minibatch4(data, batchsize)
     bsize = size(data)
-    
+
     info("Dataset size: $bsize")
+
+    model = ismlp ? mlpgan : dcgan
+    generator, discriminator = model(zsize, atype)
+    generator_params, generator_forward, generator_update = generator
+    discriminator_params, discriminator_forward, discriminator_update = discriminator
+
+    gnumparam = numparams(generator_params)
+    dnumparam = numparams(discriminator_params)
+    info("Generator # of Parameters: $gnumparam")
+    info("Discriminator # of Parameters: $dnumparam")
+
+    batches = minibatch4(data, batchsize, atype)
+
+    info("Started Training...")
+    #for epoch in 1:numepoch
+    #    for minibatch in batches
+            z = samplenoise4(zsize, batchsize, atype)
+            gen = generator_forward(z)
+            dis = discriminator_forward(minibatch)
+    #    end
+    # end
+
 end
 
-main("--usegpu --batchsize 128")
+main("--usegpu")
