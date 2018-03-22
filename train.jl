@@ -59,16 +59,9 @@ function main(args)
     info("Generator # of Parameters: $gnumparam")
     info("Discriminator # of Parameters: $dnumparam")
 
-    # TODO: Make a function for this
-    randz = samplenoise4(zsize, 25, atype)
-    genimgs = Array(generator_forward(randz)) .* 255
-
-    images = map(i->reshape(genimgs[:,:,:,i], (64, 64, 3)), 1:25)
-    grid = make_image_grid(images; gridsize=(5, 5), scale=1.0)
-
+    grid = generateimgs(generator_forward, zsize, atype)
     outfile = "rand.png"
     save(outfile, colorview(RGB, grid))
-    # End of temporary stuff
 
     batches = minibatch4(data, batchsize, atype)
 

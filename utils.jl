@@ -89,6 +89,14 @@ function numparams(paramarr)
     return count
 end
 
+function generateimgs(generator, zsize, atype; n=36, gridsize=(6,6), scale=1.0)
+    randz = samplenoise4(zsize, n, atype)
+    genimgs = Array(generator(randz)) .* 255
+
+    images = map(i->reshape(genimgs[:,:,:,i], (64, 64, 3)), 1:n)
+    return make_image_grid(images; gridsize=gridsize, scale=scale)
+end
+
 # Test stuff
 # println("Reading dataset")
 # @time myimgs = readimgs("/home/cem/bedroom_train", 4096)
