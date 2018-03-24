@@ -4,12 +4,14 @@ function conv2d(inchannel, outchannel, kernelsize; stride=1, padding=0,
                 activation=relu, transposed=false)
     wsize = transposed ? (kernelsize, kernelsize, outchannel, inchannel) : (kernelsize, kernelsize, inchannel, outchannel)
     bsize = (1, 1, outchannel, 1)
+
     function forward(x, w, b)
         x = transposed ? deconv4(w, x, padding=padding, stride=stride) : conv4(w, x, padding=padding, stride=stride)
         x = x .+ b
         activation != nothing ? activation.(x) : x
     end
-    return wsize, bsize, forward
+
+    return wsize, bsize, forward, "conv"
 end
 
 function dense(insize, outsize; activation=nothing)
@@ -21,10 +23,17 @@ function dense(insize, outsize; activation=nothing)
         x = x .+ b
         activation != nothing ? activation.(x) : x
     end
-    return wsize, bsize, forward
+    return wsize, bsize, forward, "dense"
 end
 
-function sequential(atype, layers...; winit=xavier, binit=zeros)
+function bnorm(channels)
+    function forward(x, moments, params, training)
+        return batchnorm(x, moments, params, training=training)
+    end
+    return channels, forward, "bn"
+end
+
+function sequential(atype, layers...;winit=xavier, binit=zeros)
     """
     `layers...` are the layers implemented in the `layers.jl` file. This layers
     returns 3-element tuples containing weight size, bias size and the forward pass functions.
@@ -32,29 +41,54 @@ function sequential(atype, layers...; winit=xavier, binit=zeros)
     is a function that takes inputs `x` and passes x through the network and last
     element is a function to update the parameters given a gradient
     """
-    ws = Any[]
+    ltypes = Any[]
+    params = Any[]
+    moments = Any[]
     forws = Any[]
 
     for l in layers
-        push!(ws, winit(l[1])) # Init the weight
-        push!(ws, binit(l[2])) # Init the bias
-        push!(forws, l[3]) # Layer forward
+        ltype = l[end]
+        push!(ltypes, ltype)
+
+        if ltype == "bn" # This means batchnorm
+            channels = l[1]
+            push!(moments, bnmoments()) # Get moments
+            push!(params, bnparams(channels)) # Init BN params
+            push!(forws, l[2]) # BN forward
+        else
+            push!(params, winit(l[1])) # Init the weight
+            push!(params, binit(l[2])) # Init the bias
+            push!(forws, l[3]) # Layer forward
+            push!(moments, nothing) # For the sake of indexing done below
+        end
+
     end
 
-    ws = map(atype, ws)
+    params = map(atype, params)
 
-    function forward(x)
-        i = 1
-        for f in forws
-            x = f(x, ws[i], ws[i+1])
-            i += 2
+    function forward(x; training=true)
+        i = 1 # For parameters
+        j = 1 # For moments
+        for (l, f) in zip(ltypes, forws)
+            if l == "bn"
+                x = f(x, moments[j], params[i], training)
+                i += 1
+            else
+                x = f(x, params[i], params[i+1])
+                i += 2
+            end
+            j += 1
         end
         return x
     end
 
     function update(grads, optims)
-        update!(ws, grads, optims)
+        update!(params, grads, optims)
     end
 
-    ws, forward, update
+    params, forward, update
+end
+
+function leakyrelu(alpha)
+    return x->relu(x) - relu(-x) * alpha
 end

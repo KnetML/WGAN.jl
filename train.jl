@@ -10,13 +10,14 @@ function main(args)
 
     @add_arg_table s begin
         ("--usegpu"; action=:store_true; help="use GPU or not")
-        ("--bn"; action=:store_true; help="Use batchnorm in generator")
-        ("--mlp"; action=:store_true; help="Use 4 layer MLP as generator")
+        ("--type"; arg_type=String; default="dcganbn"; help="Type of model one of: [dcganbn, mlpganbn, dcgan, mlpgan]")
         ("--procedure"; arg_type=String; default="gan"; help="Training procedure. gan or wgan")
         ("--zsize"; arg_type=Int; default=100; help="Noise vector dimension")
         ("--epochs"; arg_type=Int; default=20; help="Number of training epochs")
         ("--report"; arg_type=Int; default=500; help="Report loss in n iterations")
-        ("--batchsize"; arg_type=Int; default=128; help="batchsize")
+        ("--batchsize"; arg_type=Int; default=128; help="Minibatch Size")
+        ("--lr"; arg_type=Any; default=0.0002; help="Learning rate")
+        ("--leak"; arg_type=Any; default=0.2; help="LeakyReLU leak.")
     end
 
     isa(args, AbstractString) && (args=split(args))
@@ -26,17 +27,14 @@ function main(args)
 
     batchsize = o[:batchsize]
     procedure = o[:procedure]
-    ismlp = o[:mlp]
-    isbn = o[:bn]
     zsize = o[:zsize]
     numepoch = o[:epochs]
-
-    generatortype = ismlp ? "MLP " : "DCGAN "
-    generatortype *= isbn ? "BN" : "No BN"
+    modeltype = o[:type]
+    leak = o[:leak]
 
     info("Minibatch Size: $batchsize")
     info("Training Procedure: $procedure")
-    info("Generator Type: $generatortype")
+    info("Model Type: $modeltype")
     info("Noise size: $zsize")
     info("Number of epochs: $numepoch")
 
@@ -49,8 +47,21 @@ function main(args)
 
     info("Dataset size: $bsize")
 
-    model = ismlp ? mlpgan : dcgan
-    generator, discriminator = model(zsize, atype)
+    # Get model from models.jl
+    if modeltype == "dcganbn"
+        model = dcganbnorm
+    elseif modeltype == "dcgan"
+        model = dcgan
+    elseif modeltype == "mlpganbn"
+        model = mlpganbnorm
+    elseif modeltype == "mlpgan"
+        model = mlpgan
+    else
+        throw(ArgumentError("Unknown model type."))
+    end
+
+    generator, discriminator = model(zsize, leak, atype)
+
     generator_params, generator_forward, generator_update = generator
     discriminator_params, discriminator_forward, discriminator_update = discriminator
 
