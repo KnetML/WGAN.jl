@@ -1,5 +1,6 @@
 include("models.jl")
 include("utils.jl")
+include("loss.jl")
 using Knet, ArgParse, FileIO, Images
 include(Pkg.dir("Knet","data","imagenet.jl"))
 
@@ -17,6 +18,7 @@ function main(args)
         ("--report"; arg_type=Int; default=500; help="Report loss in n iterations")
         ("--batchsize"; arg_type=Int; default=128; help="Minibatch Size")
         ("--lr"; arg_type=Any; default=0.0002; help="Learning rate")
+        ("--opt"; arg_type=String; default="adam"; help="Optimizer, one of: [adam, rmsprop]")
         ("--leak"; arg_type=Any; default=0.2; help="LeakyReLU leak.")
     end
 
@@ -31,12 +33,15 @@ function main(args)
     numepoch = o[:epochs]
     modeltype = o[:type]
     leak = o[:leak]
+    optimizer = o[:opt]
+    lr = o[:lr]
 
     info("Minibatch Size: $batchsize")
     info("Training Procedure: $procedure")
     info("Model Type: $modeltype")
     info("Noise size: $zsize")
     info("Number of epochs: $numepoch")
+    info("Using $optimizer with learning rate $lr")
 
     o[:usegpu] ? info("Using GPU") : info("Not using GPU (why)")
 
@@ -62,29 +67,57 @@ function main(args)
 
     generator, discriminator = model(zsize, leak, atype)
 
-    generator_params, generator_forward, generator_update = generator
-    discriminator_params, discriminator_forward, discriminator_update = discriminator
+    gparams, gforw = generator
+    dparams, dforw = discriminator
 
-    gnumparam = numparams(generator_params)
-    dnumparam = numparams(discriminator_params)
+    gnumparam = numparams(gparams)
+    dnumparam = numparams(dparams)
     info("Generator # of Parameters: $gnumparam")
     info("Discriminator # of Parameters: $dnumparam")
 
-    grid = generateimgs(generator_forward, zsize, atype)
+    # Form optimiziers
+    if optimizer == "adam"
+        gopt = optimizers(gparams, Adam, lr=lr, beta1=0.5)
+        dopt = optimizers(dparams, Adam, lr=lr, beta1=0.5)
+    elseif opt == "rmsprop"
+        gopt = optimizers(gparams, Rmsprop, lr=lr)
+        dopt = optimizers(dparams, Rmsprop, lr=lr)
+    else:
+        throw(ArgumentError("Unknown optimizer"))
+    end
+
+    # Save first randomly generated image
+    grid = generateimgs(gforw, gparams, zsize, atype)
     outfile = "rand.png"
     save(outfile, colorview(RGB, grid))
 
     batches = minibatch4(data, batchsize, atype)
 
+    gradfun = procedure == "gan" ? gangrad : gangrad # TODO: wgangrad
+    ggradfun, dgradfun = gradfun(atype, gforw, dforw)
+
     info("Started Training...")
     for epoch in 1:numepoch
+        gtotalloss = 0.0
+        dtotalloss = 0.0
         for minibatch in batches
             z = samplenoise4(zsize, batchsize, atype)
-            gen = generator_forward(z)
-            dis = discriminator_forward(batches[1])
-            # TODO: Loss metrics and parameter update
+            ggrad, gloss = ggradfun(gparams, dparams, minibatch, z)
+            dgrad, dloss = dgradfun(dparams, gparams, minibatch, z)
+            update!(gparams, ggrad, gopt)
+            update!(dgrad, dparams, dopt)
+            gtotalloss += gloss * batchsize
+            dtotalloss += dloss * batchsize
        end
+       gtotalloss /= bsize[1]
+       dtotalloss /= bsize[1]
+       elapsed = 0
+       info("Epoch $epoch took $elapsed: G Loss: $gtotalloss D Loss: $dtotalloss")
     end
+
+    grid = generateimgs(gforw, gparams, zsize, atype)
+    outfile = "trained.png"
+    save(outfile, colorview(RGB, grid))
 
     info("Done. Exiting...")
     return 0

@@ -66,7 +66,7 @@ function sequential(atype, layers...;winit=xavier, binit=zeros)
 
     params = map(atype, params)
 
-    function forward(x; training=true)
+    function forward(x, params; training=true)
         i = 1 # For parameters
         j = 1 # For moments
         for (l, f) in zip(ltypes, forws)
@@ -81,14 +81,10 @@ function sequential(atype, layers...;winit=xavier, binit=zeros)
         end
         return x
     end
-
-    function update(grads, optims)
-        update!(params, grads, optims)
-    end
-
-    params, forward, update
+    # Use moments inside the function but return params to use in grad functions
+    params, forward
 end
 
 function leakyrelu(alpha)
-    return x->relu(x) - relu(-x) * alpha
+    return x -> (relu(x) - relu(-x) * alpha)
 end
