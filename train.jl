@@ -1,9 +1,10 @@
 include("models.jl")
 include("utils.jl")
 include("loss.jl")
-using Knet, ArgParse, FileIO, Images
-include(Pkg.dir("Knet","data","imagenet.jl"))
+using Knet, ArgParse, FileIO, Images, Logging
 
+Logging.configure(output=open("train.log", "a"))
+Logging.configure(level=INFO)
 
 function main(args)
     s = ArgParseSettings()

@@ -21,7 +21,6 @@ function ganloss(atype, gforw, dforw)
     # TODO: gloss and dloss calls forward. Can we fix that?
 
     function gloss(gparams, dparams, x, z)
-        println("Generator")
         batchsize = size(x)[end]
         positive = atype(ones(1, batchsize))
 
@@ -31,7 +30,6 @@ function ganloss(atype, gforw, dforw)
     end
 
     function dloss(dparams, gparams, x, z)
-        println("Dis")
         batchsize = size(x)[end]
         negative = atype(zeros(1, batchsize))
         positive = atype(ones(1, batchsize))

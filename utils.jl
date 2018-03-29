@@ -1,28 +1,36 @@
-using FileIO, Images, ImageCore, JLD
+using FileIO, Images, ImageCore, JLD, Logging
+include(Pkg.dir("Knet","data","imagenet.jl"))
 
-@everywhere function readimg(dir, width, height, atype)
+function readimg(dir, width, height, atype)
     img = Images.imresize(FileIO.load(dir), width, height)
     img = atype.(Images.rawview(ImageCore.channelview(img)[1:3, :, :]))
-    # if length(img) != 3*width*height TODO: Find an elegant solution for this
-    #     println(dir)
-    #     rm(dir)
-    #     return randn(1, 64, 64, 3)
-    # end
-    # TODO: Normalize between (-1, 1)
-    img = permutedims(img, (2,3,1)) ./ 255
-    return reshape(img, 1, width, height, 3)
+    return img
+end
+
+function normalize(x, min, max)
+    oldmin = minimum(x)
+    oldmax = maximum(x)
+    oldrange = oldmax - oldmin
+    newrange = max - min
+
+    scale = (x .- oldmin) ./ oldrange
+    return scale .* newrange .+ min
 end
 
 function readimgs(basedir::String, num::Int;
-                  extension=".webp", width=64, height=64, atype=Float32)
+                  extension=".webp", width=64, height=64, atype=Float32, report=10000)
     imgdirs = readdir(basedir)
     if num == -1
         num = length(imgdirs)
     end
-    imgs = @parallel vcat for i = 1:num
+    imgs = Any[]
+    for i = 1:num
+        i % report == 0 && info("$i/$num Images read.")
         if contains(imgdirs[i], extension)
             imgdir = joinpath(basedir, imgdirs[i])
-            readimg(imgdir, width, height, atype)
+            img = readimg(imgdir, width, height, atype)
+            img = normalize(permutedims(img, (2,3,1)), -1, 1)
+            imgs = vcat(imgs, reshape(img, 1, width, height, 3))
         end
     end
     return imgs
@@ -35,7 +43,7 @@ function samplenoise4(size, n, atype)
     return atype(reshape(randn(size, n), 1, 1, size, n))
 end
 
-@everywhere function savetensor(tensor, filepath; name="tensor")
+function savetensor(tensor, filepath; name="tensor")
     JLD.jldopen(filepath, "w") do file
         write(file, name, tensor)
     end
@@ -53,7 +61,7 @@ function saveimgtensors(basedir, imgs, bsize)
     end
 end
 
-@everywhere function loadtensor(filepath; name="tensor")
+function loadtensor(filepath; name="tensor")
     JLD.jldopen(filepath, "r") do file
         read(file, name)
     end
@@ -61,9 +69,11 @@ end
 
 function loadimgtensors(basedir)
     tensordirs = readdir(basedir)
-    imgs = @parallel vcat for dir in tensordirs
-        loadtensor(joinpath(basedir, dir))
+    imgs = Any[]
+    for dir in tensordirs
+        imgs = vcat(imgs, loadtensor(joinpath(basedir, dir)))
     end
+    return imgs
 end
 
 function minibatch4(X, batchsize, atype)
@@ -91,20 +101,18 @@ end
 
 function generateimgs(generator, params, zsize, atype; n=36, gridsize=(6,6), scale=1.0)
     randz = samplenoise4(zsize, n, atype)
-    genimgs = Array(generator(randz, params)) .* 255
-
+    genimgs = Array(generator(randz, params))
     images = map(i->reshape(genimgs[:,:,:,i], (64, 64, 3)), 1:n)
     return make_image_grid(images; gridsize=gridsize, scale=scale)
 end
 
-# Test stuff
-# println("Reading dataset")
-# @time myimgs = readimgs("/home/cem/bedroom_train", 4096)
-# println(size(myimgs))
-#
-# println("Save dataset")
-# @time saveimgtensors("/home/cem/bedroom", myimgs, 4096)
-#
-# #println("Load processed dataset")
-# @time loadedimgs = loadimgtensors("/home/cem/bedroom")
-# println(size(loadedimgs))
+function saveimgs(imgs; scale=1.0)
+    """
+    First dimension is number of elements, n has to be square
+    """
+    n = size(imgs, 1)
+    images = map(i->reshape(imgs[i,:,:,:], (64, 64, 3)), 1:n)
+    grid = Int(sqrt(n))
+    grid = make_image_grid(images; gridsize=(grid, grid), scale=scale)
+    save("images.png", colorview(RGB, grid))
+end
