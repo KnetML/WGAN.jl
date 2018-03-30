@@ -1,7 +1,7 @@
 include("utils.jl")
 using ArgParse, Logging
 
-Logging.configure(output=open("process.log", "a"))
+Logging.configure(output=open("process.log", "w"))
 Logging.configure(level=INFO)
 
 function main(args)

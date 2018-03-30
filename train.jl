@@ -106,7 +106,7 @@ function main(args)
             ggrad, gloss = ggradfun(gparams, dparams, minibatch, z)
             dgrad, dloss = dgradfun(dparams, gparams, minibatch, z)
             update!(gparams, ggrad, gopt)
-            update!(dgrad, dparams, dopt)
+            update!(dparams, dgrad, dopt)
             gtotalloss += gloss * batchsize
             dtotalloss += dloss * batchsize
        end

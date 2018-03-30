@@ -4,7 +4,7 @@ include(Pkg.dir("Knet","data","imagenet.jl"))
 function readimg(dir, width, height, atype)
     img = Images.imresize(FileIO.load(dir), width, height)
     img = atype.(Images.rawview(ImageCore.channelview(img)[1:3, :, :]))
-    return img
+    return permutedims(img, (2,3,1))
 end
 
 function normalize(x, min, max)
@@ -24,15 +24,21 @@ function readimgs(basedir::String, num::Int;
         num = length(imgdirs)
     end
     imgs = Any[]
+    fail = 0
     for i = 1:num
         i % report == 0 && info("$i/$num Images read.")
         if contains(imgdirs[i], extension)
             imgdir = joinpath(basedir, imgdirs[i])
             img = readimg(imgdir, width, height, atype)
-            img = normalize(permutedims(img, (2,3,1)), -1, 1)
-            imgs = vcat(imgs, reshape(img, 1, width, height, 3))
+            if length(img) != width*height*3
+                warning("Dimensions are not correct: $imgdir")
+                fail += 1
+                continue
+            end
+            imgs = vcat(imgs, reshape(img, 1, height, width, 3))
         end
     end
+    info("$fail many images failed to load.")
     return imgs
 end
 
@@ -73,7 +79,7 @@ function loadimgtensors(basedir)
     for dir in tensordirs
         imgs = vcat(imgs, loadtensor(joinpath(basedir, dir)))
     end
-    return imgs
+    return normalize(imgs, -1, 1)
 end
 
 function minibatch4(X, batchsize, atype)
