@@ -1,10 +1,7 @@
 include("models.jl")
 include("utils.jl")
 include("loss.jl")
-using Knet, ArgParse, FileIO, Images, Logging
-
-Logging.configure(output=open("train.log", "a"))
-Logging.configure(level=INFO)
+using Knet, ArgParse, FileIO, Images
 
 function main(args)
     s = ArgParseSettings()
@@ -37,21 +34,20 @@ function main(args)
     optimizer = o[:opt]
     lr = o[:lr]
 
-    info("Minibatch Size: $batchsize")
-    info("Training Procedure: $procedure")
-    info("Model Type: $modeltype")
-    info("Noise size: $zsize")
-    info("Number of epochs: $numepoch")
-    info("Using $optimizer with learning rate $lr")
+    println("Minibatch Size: $batchsize")
+    println("Training Procedure: $procedure")
+    println("Model Type: $modeltype")
+    println("Noise size: $zsize")
+    println("Number of epochs: $numepoch")
+    println("Using $optimizer with learning rate $lr")
 
-    o[:usegpu] ? info("Using GPU") : info("Not using GPU (why)")
+    o[:usegpu] ? println("Using GPU") : println("Not using GPU (why)")
 
-    info("Loading dataset")
+    println("Loading dataset")
 
-    data = loadimgtensors("/home/cem/bedroom")
+    data = loadimgtensors("/home/cem/bedroom", (1,10))
     bsize = size(data)
-
-    info("Dataset size: $bsize")
+    println("Dataset size: $bsize")
 
     # Get model from models.jl
     if modeltype == "dcganbn"
@@ -73,8 +69,8 @@ function main(args)
 
     gnumparam = numparams(gparams)
     dnumparam = numparams(dparams)
-    info("Generator # of Parameters: $gnumparam")
-    info("Discriminator # of Parameters: $dnumparam")
+    println("Generator # of Parameters: $gnumparam")
+    println("Discriminator # of Parameters: $dnumparam")
 
     # Form optimiziers
     if optimizer == "adam"
@@ -92,17 +88,18 @@ function main(args)
     outfile = "rand.png"
     save(outfile, colorview(RGB, grid))
 
+    println("Making minibatches")
     batches = minibatch4(data, batchsize, atype)
 
     gradfun = procedure == "gan" ? gangrad : gangrad # TODO: wgangrad
     ggradfun, dgradfun = gradfun(atype, gforw, dforw)
 
-    info("Started Training...")
+    println("Started Training...")
     for epoch in 1:numepoch
         gtotalloss = 0.0
         dtotalloss = 0.0
         for minibatch in batches
-            z = samplenoise4(zsize, batchsize, atype)
+            z = samplenoise4(zsize, size(minibatch)[end], atype)
             ggrad, gloss = ggradfun(gparams, dparams, minibatch, z)
             dgrad, dloss = dgradfun(dparams, gparams, minibatch, z)
             update!(gparams, ggrad, gopt)
@@ -113,14 +110,14 @@ function main(args)
        gtotalloss /= bsize[1]
        dtotalloss /= bsize[1]
        elapsed = 0
-       info("Epoch $epoch took $elapsed: G Loss: $gtotalloss D Loss: $dtotalloss")
+       println("Epoch $epoch took $elapsed: G Loss: $gtotalloss D Loss: $dtotalloss")
     end
 
     grid = generateimgs(gforw, gparams, zsize, atype)
     outfile = "trained.png"
     save(outfile, colorview(RGB, grid))
 
-    info("Done. Exiting...")
+    println("Done. Exiting...")
     return 0
 end
 

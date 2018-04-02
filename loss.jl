@@ -25,7 +25,7 @@ function ganloss(atype, gforw, dforw)
         positive = atype(ones(1, batchsize))
 
         generated = gforw(z, gparams) # G(z)
-        fakeclss = reshape(dforw(generated, dparams), 1, batchsize) # D(G(z))
+        fakeclss = mat(dforw(generated, dparams)) # D(G(z))
         return binaryxentropy(positive, fakeclss)
     end
 
@@ -35,8 +35,8 @@ function ganloss(atype, gforw, dforw)
         positive = atype(ones(1, batchsize))
 
         generated = gforw(z, gparams) # G(z)
-        fakeclss = reshape(dforw(generated, dparams), 1, batchsize) # D(G(z))
-        realclss = reshape(dforw(x, dparams), 1, batchsize) # D(x)
+        fakeclss = mat(dforw(generated, dparams)) # D(G(z))
+        realclss = mat(dforw(x, dparams)) # D(x)
 
         return binaryxentropy(positive, realclss) + binaryxentropy(negative, fakeclss)
     end

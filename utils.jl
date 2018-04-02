@@ -1,8 +1,8 @@
-using FileIO, Images, ImageCore, JLD, Logging
+using FileIO, Images, ImageCore, JLD
 include(Pkg.dir("Knet","data","imagenet.jl"))
 
-function readimg(dir, width, height, atype)
-    img = Images.imresize(FileIO.load(dir), width, height)
+@everywhere function readimg(dir, imsize, atype)
+    img = Images.imresize(FileIO.load(dir), imsize)
     img = atype.(Images.rawview(ImageCore.channelview(img)[1:3, :, :]))
     return permutedims(img, (2,3,1))
 end
@@ -17,29 +17,41 @@ function normalize(x, min, max)
     return scale .* newrange .+ min
 end
 
-function readimgs(basedir::String, num::Int;
-                  extension=".webp", width=64, height=64, atype=Float32, report=10000)
+function processimgs(basedir::String, bsize::Int, outdir::String;
+                     extension=".webp", imsize=(64, 64), atype=Float32)
     imgdirs = readdir(basedir)
-    if num == -1
-        num = length(imgdirs)
-    end
-    imgs = Any[]
-    fail = 0
-    for i = 1:num
-        i % report == 0 && info("$i/$num Images read.")
-        if contains(imgdirs[i], extension)
-            imgdir = joinpath(basedir, imgdirs[i])
-            img = readimg(imgdir, width, height, atype)
-            if length(img) != width*height*3
-                warning("Dimensions are not correct: $imgdir")
-                fail += 1
-                continue
+    num = length(imgdirs)
+    total = Int(ceil(num/bsize))
+
+    for j = 1:bsize:num
+        upper = min(num,j+bsize)
+        idx = Int(floor(j/bsize)) + 1
+        imgs = SharedArray{atype}(upper-j, imsize[1], imsize[2], 3)
+        info("Reading $idx/$total")
+
+        @sync @parallel for i = j:upper
+            if contains(imgdirs[i], extension)
+                imgdir = joinpath(basedir, imgdirs[i])
+                img = readimg(imgdir, imsize, atype)
+                if length(img) != imsize[1] * imsize[2] * 3
+                    # warn("Grayscale Image: $imgdir")
+                    continue
+                end
+                imgidx = i % bsize
+                if imgidx == 0
+                    imgidx = bsize
+                end
+                imgs[imgidx,:,:,:] = img
             end
-            imgs = vcat(imgs, reshape(img, 1, height, width, 3))
         end
+
+        imgs = Array{Float32}(imgs)
+        info("Saving $idx/$total")
+        filepath = joinpath(outdir, string(idx))*".jld"
+        imgs = normalize(imgs, -1, 1)
+        savetensor(imgs, filepath)
+        info("Done $idx/$total")
     end
-    info("$fail many images failed to load.")
-    return imgs
 end
 
 function samplenoise4(size, n, atype)
@@ -49,37 +61,38 @@ function samplenoise4(size, n, atype)
     return atype(reshape(randn(size, n), 1, 1, size, n))
 end
 
-function savetensor(tensor, filepath; name="tensor")
+@everywhere function savetensor(tensor, filepath; name="tensor")
     JLD.jldopen(filepath, "w") do file
         write(file, name, tensor)
     end
 end
 
 function saveimgtensors(basedir, imgs, bsize)
-    for k = 1:bsize:size(imgs, 1)
+    total = Int(size(imgs, 1) / bsize)
+    @sync @parallel for k = 1:bsize:size(imgs, 1)
         lo = k
         hi = min(k+bsize-1, size(imgs, 1))
         tensor = imgs[lo:hi,:,:,:]
-        println(size(tensor))
         bid = Int(floor(k/bsize))
         filepath = joinpath(basedir, string(bid))*".jld"
         savetensor(tensor, filepath)
+        println("$bid/$total saved.")
     end
 end
 
-function loadtensor(filepath; name="tensor")
+@everywhere function loadtensor(filepath; name="tensor")
     JLD.jldopen(filepath, "r") do file
         read(file, name)
     end
 end
 
-function loadimgtensors(basedir)
+function loadimgtensors(basedir::String, idxs::Tuple{Int, Int})
     tensordirs = readdir(basedir)
-    imgs = Any[]
-    for dir in tensordirs
-        imgs = vcat(imgs, loadtensor(joinpath(basedir, dir)))
+    imgs = @sync @parallel (vcat) for dir in tensordirs[idxs[1]:idxs[2]]
+        println("Loading $dir")
+        loadtensor(joinpath(basedir, dir))
     end
-    return normalize(imgs, -1, 1)
+    return imgs
 end
 
 function minibatch4(X, batchsize, atype)
@@ -108,6 +121,7 @@ end
 function generateimgs(generator, params, zsize, atype; n=36, gridsize=(6,6), scale=1.0)
     randz = samplenoise4(zsize, n, atype)
     genimgs = Array(generator(randz, params))
+    genimgs = normalize(genimgs, 0, 1) # Normalize back to 0,1
     images = map(i->reshape(genimgs[:,:,:,i], (64, 64, 3)), 1:n)
     return make_image_grid(images; gridsize=gridsize, scale=scale)
 end
