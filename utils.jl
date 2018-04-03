@@ -1,6 +1,10 @@
 using FileIO, Images, ImageCore, JLD
 include(Pkg.dir("Knet","data","imagenet.jl"))
 
+@everywhere function myprint(msg::String)
+    println(msg); flush(STDOUT)
+end
+
 @everywhere function readimg(dir, imsize, atype)
     img = Images.imresize(FileIO.load(dir), imsize)
     img = atype.(Images.rawview(ImageCore.channelview(img)[1:3, :, :]))
@@ -76,7 +80,7 @@ function saveimgtensors(basedir, imgs, bsize)
         bid = Int(floor(k/bsize))
         filepath = joinpath(basedir, string(bid))*".jld"
         savetensor(tensor, filepath)
-        println("$bid/$total saved.")
+        myprint("$bid/$total saved.")
     end
 end
 
@@ -89,10 +93,15 @@ end
 function loadimgtensors(basedir::String, idxs::Tuple{Int, Int})
     tensordirs = readdir(basedir)
     imgs = @sync @parallel (vcat) for dir in tensordirs[idxs[1]:idxs[2]]
-        println("Loading $dir")
+        # myprint("Loading $dir")
         loadtensor(joinpath(basedir, dir))
     end
     return imgs
+end
+
+function getnumchunks(dir::String)
+    tensordirs = readdir(dir)
+    return length(tensordirs)
 end
 
 function minibatch4(X, batchsize, atype)
@@ -105,7 +114,7 @@ function minibatch4(X, batchsize, atype)
         limit = min(i+batchsize-1, size(X, 1))
         minibatch = X[i:limit, :, :, :]
         per = permutedims(minibatch, [2, 3, 4, 1]) # Examples are last element
-        push!(data, atype(per))
+        push!(data, per)
     end
     return data
 end
@@ -120,7 +129,7 @@ end
 
 function generateimgs(generator, params, zsize, atype; n=36, gridsize=(6,6), scale=1.0)
     randz = samplenoise4(zsize, n, atype)
-    genimgs = Array(generator(randz, params))
+    genimgs = Array(generator(randz, params, training=false))
     genimgs = normalize(genimgs, 0, 1) # Normalize back to 0,1
     images = map(i->reshape(genimgs[:,:,:,i], (64, 64, 3)), 1:n)
     return make_image_grid(images; gridsize=gridsize, scale=scale)
