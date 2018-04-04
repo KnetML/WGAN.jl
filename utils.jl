@@ -5,6 +5,13 @@ include(Pkg.dir("Knet","data","imagenet.jl"))
     println(msg); flush(STDOUT)
 end
 
+function appendcsv(dir::String, elements...)
+    line = join(elements, ",")
+    open(dir, "a") do f
+        write(f, "$line\n")
+    end
+end
+
 @everywhere function readimg(dir, imsize, atype)
     img = Images.imresize(FileIO.load(dir), imsize)
     img = atype.(Images.rawview(ImageCore.channelview(img)[1:3, :, :]))
@@ -104,11 +111,12 @@ function getnumchunks(dir::String)
     return length(tensordirs)
 end
 
-function minibatch4(X, batchsize, atype)
+function minibatch4(X, batchsize, atype; sh=true)
     """
     Size of X is (N, w, h, c)
     Outputs array where each element has size (w, h, c, b)
     """
+    if sh X = X[shuffle(1:end),:,:,:] end
     data = Any[]
     for i=1:batchsize:size(X, 1)
         limit = min(i+batchsize-1, size(X, 1))
@@ -127,9 +135,9 @@ function numparams(paramarr)
     return count
 end
 
-function generateimgs(generator, params, zsize, atype; n=36, gridsize=(6,6), scale=1.0)
+function generateimgs(generator, params, moments, zsize, atype; n=36, gridsize=(6,6), scale=1.0)
     randz = samplenoise4(zsize, n, atype)
-    genimgs = Array(generator(randz, params, training=false))
+    genimgs = Array(generator(params, moments, randz, training=false))
     genimgs = normalize(genimgs, 0, 1) # Normalize back to 0,1
     images = map(i->reshape(genimgs[:,:,:,i], (64, 64, 3)), 1:n)
     return make_image_grid(images; gridsize=gridsize, scale=scale)

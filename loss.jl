@@ -1,7 +1,7 @@
 using Knet
 
-function binaryxentropy(real, logits; average=true)
-    loss = max.(logits, 0) - logits .* real + log.(1 + exp.(-abs.(logits)))
+function binaryxentropy(logits, gold; average=true)
+    loss = max.(logits, 0) - logits .* gold + log.(exp.(abs.(logits) .* -1) .+ 1)
     loss = sum(loss)
     if average
         return loss / size(logits, 2)
@@ -9,41 +9,46 @@ function binaryxentropy(real, logits; average=true)
     return loss
 end
 
-function ganloss(atype, gforw, dforw)
-    """
-    Discriminator maximizes logD(x) + log(1-D(G(z))
-    Generator maximizes log(D(G(z)))
-    These are equivalent to minimizing nll
-    logD(x) -> minimize nll between D(x) and 1
-    log(1-D(G(z))) -> minimize nll between D(G(z)) and 0
-    log(D(G(z))) -> minimize nll between D(G(z)) and 1
-    """
-    # TODO: gloss and dloss calls forward. Can we fix that?
-
-    function gloss(gparams, dparams, x, z)
-        batchsize = size(x)[end]
-        positive = atype(ones(1, batchsize))
-
-        generated = gforw(z, gparams) # G(z)
-        fakeclss = mat(dforw(generated, dparams)) # D(G(z))
-        return binaryxentropy(positive, fakeclss)
-    end
-
-    function dloss(dparams, gparams, x, z)
-        batchsize = size(x)[end]
-        negative = atype(zeros(1, batchsize))
-        positive = atype(ones(1, batchsize))
-
-        generated = gforw(z, gparams) # G(z)
-        fakeclss = mat(dforw(generated, dparams)) # D(G(z))
-        realclss = mat(dforw(x, dparams)) # D(x)
-
-        return binaryxentropy(positive, realclss) + binaryxentropy(negative, fakeclss)
-    end
-    return gloss, dloss
+function ganDloss(dparams, dmoments, dforw, real, fake, positive, negative, leak)
+    realclss = mat(dforw(dparams, dmoments, real, leak))
+    fakeclss = mat(dforw(dparams, dmoments, fake, leak))
+    return binaryxentropy(realclss, positive) + binaryxentropy(fakeclss, negative)
 end
 
-function gangrad(atype, gforw, dforw)
-    gloss, dloss = ganloss(atype, gforw, dforw)
-    return gradloss(gloss), gradloss(dloss)
+function ganGloss(gparams, dparams, gmoments, dmoments, gforw, dforw, z, positive, leak)
+    fakeimg = gforw(gparams, gmoments, z)
+    fakeclss = mat(dforw(dparams, dmoments, fakeimg, leak))
+    return binaryxentropy(fakeclss, positive)
+end
+
+ganGgradloss = gradloss(ganGloss)
+ganDgradloss = gradloss(ganDloss)
+
+function traingan(zsize, atype)
+    function trainD(dparams, gparams, gmoments, dmoments, gforw, dforw, x, opts, leak)
+        batchsize = size(x)[end]
+
+        positive = atype(ones(1, batchsize))
+        negative = atype(zeros(1, batchsize))
+        z = samplenoise4(zsize, batchsize, atype)
+
+        generated = gforw(gparams, gmoments, z)
+        grad, loss = ganDgradloss(dparams, dmoments, dforw, x, generated, positive, negative, leak)
+        update!(dparams, grad, opts)
+        return loss
+    end
+
+    function trainG(gparams, dparams, gmoments, dmoments, gforw, dforw, x, opts, leak)
+        batchsize = size(x)[end]
+
+        positive = atype(ones(1, batchsize))
+        negative = atype(zeros(1, batchsize))
+        z = samplenoise4(zsize, batchsize, atype)
+
+        grad, loss = ganGgradloss(gparams, dparams, gmoments, dmoments, gforw, dforw, z, positive, leak)
+        update!(gparams, grad, opts)
+        return loss
+    end
+
+    return trainD, trainG
 end

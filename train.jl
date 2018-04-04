@@ -19,6 +19,7 @@ function main(args)
         ("--lr"; arg_type=Any; default=0.0002; help="Learning rate")
         ("--opt"; arg_type=String; default="adam"; help="Optimizer, one of: [adam, rmsprop]")
         ("--leak"; arg_type=Any; default=0.2; help="LeakyReLU leak.")
+        ("--out"; arg_type=String; default="/home/cem/WGAN.jl/models"; help="Output directory for saving model and generating images")
     end
 
     isa(args, AbstractString) && (args=split(args))
@@ -46,6 +47,12 @@ function main(args)
 
     o[:usegpu] ? myprint("Using GPU") : myprint("Not using GPU (why)")
 
+    outdir = joinpath(o[:out], modeltype)
+    ispath(outdir) || mkdir(outdir)
+
+    logdir = joinpath(outdir, "log.csv")
+    isfile(logdir) && rm(logdir)
+
     # Get model from models.jl
     if modeltype == "dcganbn"
         model = dcganbnorm
@@ -59,10 +66,10 @@ function main(args)
         throw(ArgumentError("Unknown model type."))
     end
 
-    generator, discriminator = model(zsize, leak, atype)
+    generator, discriminator = model(leak, zsize, atype)
 
-    gparams, gforw = generator
-    dparams, dforw = discriminator
+    gparams, gmoments, gforw = generator
+    dparams, dmoments, dforw = discriminator
 
     gnumparam = numparams(gparams)
     dnumparam = numparams(dparams)
@@ -81,12 +88,12 @@ function main(args)
     end
 
     # Save first randomly generated image
-    grid = generateimgs(gforw, gparams, zsize, atype)
+    grid = generateimgs(gforw, gparams, gmoments, zsize, atype)
     outfile = "rand.png"
     save(outfile, colorview(RGB, grid))
 
-    gradfun = procedure == "gan" ? gangrad : gangrad # TODO: wgangrad
-    ggradfun, dgradfun = gradfun(atype, gforw, dforw)
+    trainers = procedure == "gan" ? traingan : traingan # TODO: trainwgan
+    trainD, trainG = trainers(zsize, atype)
 
     numchunks = getnumchunks(datadir)
     myprint("Number of chunks: $numchunks")
@@ -97,8 +104,8 @@ function main(args)
         gtotalloss = 0.0
         dtotalloss = 0.0
 
-        for chunk in 1:10:numchunks
-            upper = min(numchunks, chunk+10-1) # TODO: Read this from sys args
+        for chunk in 1:30:numchunks
+            upper = min(numchunks, chunk+30-1) # TODO: Read this from sys args
             myprint("Loading chunks: ($chunk, $upper)")
             data = loadimgtensors(datadir, (chunk, upper))
             numelements += size(data, 1)
@@ -107,23 +114,25 @@ function main(args)
 
             for minibatch in batches
                 minibatch = atype(minibatch) # Put to GPU one by one so the memory won't explode
-                z = samplenoise4(zsize, size(minibatch, 4), atype)
-                ggrad, gloss = ggradfun(gparams, dparams, minibatch, z)
-                dgrad, dloss = dgradfun(dparams, gparams, minibatch, z)
-                update!(gparams, ggrad, gopt)
-                update!(dparams, dgrad, dopt)
+                dloss = trainD(dparams, gparams, gmoments, dmoments, gforw, dforw, minibatch, dopt, leak)
+                gloss = trainG(gparams, dparams, gmoments, dmoments, gforw, dforw, minibatch, gopt, leak)
                 gtotalloss += gloss * batchsize
                 dtotalloss += dloss * batchsize
+                appendcsv(logdir, gloss, dloss)
            end
        end
 
        gtotalloss /= numelements
        dtotalloss /= numelements
        elapsed = 0
+
        myprint("Epoch $epoch took $elapsed: G Loss: $gtotalloss D Loss: $dtotalloss")
+       grid = generateimgs(gforw, gparams, gmoments, zsize, atype)
+       outfile = joinpath(outdir, "epoch$epoch.png")
+       save(outfile, colorview(RGB, grid))
     end
 
-    grid = generateimgs(gforw, gparams, zsize, atype)
+    grid = generateimgs(gforw, gparams, gmoments, zsize, atype)
     outfile = "trained.png"
     save(outfile, colorview(RGB, grid))
 
