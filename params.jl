@@ -24,6 +24,28 @@ function dcGinitbn(atype, winit, zsize)
     return params, moments
 end
 
+function dcGinit(atype, winit, filtersize, zsize)
+    w1 = winit(4, 4, filtersize, zsize)
+    w2 = winit(4, 4, filtersize, filtersize)
+    w3 = winit(4, 4, filtersize, filtersize)
+    w4 = winit(4, 4, filtersize, filtersize)
+    w5 = winit(4, 4, 3, filtersize)
+
+    params = atype.([w1,w2,w3,w4,w5])
+    return params
+end
+
+function mlpGinit(atype, winit, hiddensize, zsize)
+    w1 = winit(hiddensize, zsize)
+    w2 = winit(hiddensize, hiddensize)
+    w3 = winit(hiddensize, hiddensize)
+    w4 = winit(hiddensize, hiddensize)
+    w5 = winit(64*64*3, hiddensize)
+
+    params = atype.([w1,w2,w3,w4,w5])
+    return params
+end
+
 function dcDinitbn(atype, winit)
     w1 = winit(4, 4, 3, 64)
     m1 = bnmoments()
@@ -46,4 +68,15 @@ function dcDinitbn(atype, winit)
     params = atype.([w1,b1,w2,b2,w3,b3,w4,b4,w5])
     moments = [m1,m2,m3,m4]
     return params, moments
+end
+
+function mlpDinit(atype, winit, hiddensize)
+    w1 = winit(hiddensize, 64*64*3)
+    w2 = winit(hiddensize, hiddensize)
+    w3 = winit(hiddensize, hiddensize)
+    w4 = winit(hiddensize, hiddensize)
+    w5 = winit(1, hiddensize)
+
+    params = atype.([w1,w2,w3,w4,w5])
+    return params
 end

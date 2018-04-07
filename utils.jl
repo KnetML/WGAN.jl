@@ -135,7 +135,7 @@ function numparams(paramarr)
     return count
 end
 
-function generateimgs(generator, params, moments, zsize, atype; n=36, gridsize=(6,6), scale=1.0)
+function generateimgs(generator, params, moments, zsize, atype; n=36, gridsize=(6,6), scale=2.0)
     randz = samplenoise4(zsize, n, atype)
     genimgs = Array(generator(params, moments, randz, training=false))
     genimgs = normalize(genimgs, 0, 1) # Normalize back to 0,1
@@ -152,4 +152,48 @@ function saveimgs(imgs; scale=1.0)
     grid = Int(sqrt(n))
     grid = make_image_grid(images; gridsize=(grid, grid), scale=scale)
     save("images.png", colorview(RGB, grid))
+end
+
+function savemodel(path, gparams, gmoments, dparams, dmoments)
+    # FIXME: Saving batch normed does not work!
+    if dmoments != nothing
+        save(path,
+             "wd", Array{Float32}.(dparams),
+             "wg", Array{Float32}.(gparams),
+             "md", convert_moments(dmoments),
+             "mg", convert_moments(gmoments))
+    else
+        save(path,
+             "wd", Array{Float32}.(dparams),
+             "wg", Array{Float32}.(gparams))
+    end
+end
+
+function loadmodel(path, atype; moment=true)
+    if moment
+        @load path wd wg md mg
+        wd = atype.(wd)
+        wg = atype.(wg)
+        return wg, mg, wd, md
+    else
+        @load path wd wg
+        wd = atype.(wd)
+        wg = atype.(wg)
+        return wg, wd
+    end
+end
+
+
+function convert_moments(moments,atype=Array{Float32})
+    clone = map(mi->bnmoments(), moments)
+    for k = 1:length(clone)
+        if moments[k].mean != nothing
+            clone[k].mean = convert(atype, moments[k].mean)
+        end
+
+        if moments[k].var != nothing
+            clone[k].var = convert(atype, moments[k].var)
+        end
+    end
+    return Array{Any,1}(clone)
 end

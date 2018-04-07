@@ -9,7 +9,8 @@ function main(args)
 
     @add_arg_table s begin
         ("--usegpu"; action=:store_true; help="use GPU or not")
-        ("--type"; arg_type=String; default="dcganbn"; help="Type of model one of: [dcganbn, mlpganbn, dcgan, mlpgan]")
+        ("--type"; arg_type=String; default="dcganbn"; help="Type of model one of: [dcganbn (regular DCGAN), mlpg (Generator is MLP),
+        mlpgb (Both MLP), dcgan (Generator has no BN and has constant filter size)]")
         ("--data"; arg_type=String; default="/home/cem/bedroom"; help="Dataset dir (processed)")
         ("--procedure"; arg_type=String; default="gan"; help="Training procedure. gan or wgan")
         ("--zsize"; arg_type=Int; default=100; help="Noise vector dimension")
@@ -58,10 +59,10 @@ function main(args)
         model = dcganbnorm
     elseif modeltype == "dcgan"
         model = dcgan
-    elseif modeltype == "mlpganbn"
-        model = mlpganbnorm
-    elseif modeltype == "mlpgan"
-        model = mlpgan
+    elseif modeltype == "mlpg"
+        model = mlpg
+    elseif modeltype == "mlpgd"
+        model = mlpgd
     else
         throw(ArgumentError("Unknown model type."))
     end
@@ -89,8 +90,10 @@ function main(args)
 
     # Save first randomly generated image
     grid = generateimgs(gforw, gparams, gmoments, zsize, atype)
-    outfile = "rand.png"
+    outfile = joinpath(outdir, "rand.png")
     save(outfile, colorview(RGB, grid))
+
+    modelpath = joinpath(outdir, "model.jld")
 
     trainers = procedure == "gan" ? traingan : traingan # TODO: trainwgan
     trainD, trainG = trainers(zsize, atype)
@@ -104,8 +107,8 @@ function main(args)
         gtotalloss = 0.0
         dtotalloss = 0.0
 
-        for chunk in 1:30:numchunks
-            upper = min(numchunks, chunk+30-1) # TODO: Read this from sys args
+        for chunk in 1:20:numchunks
+            upper = min(numchunks, chunk+20-1) # TODO: Read this from sys args
             myprint("Loading chunks: ($chunk, $upper)")
             data = loadimgtensors(datadir, (chunk, upper))
             numelements += size(data, 1)
@@ -140,4 +143,4 @@ function main(args)
     return 0
 end
 
-main("--usegpu")
+main("--usegpu --type mlpgd")
