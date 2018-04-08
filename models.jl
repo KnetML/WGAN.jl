@@ -43,8 +43,7 @@ function mlpgenerator(params, moments, x; training=true)
     x = mlp(params[1], x)
     x = mlp(params[2], x)
     x = mlp(params[3], x)
-    x = mlp(params[4], x)
-    x = mlpoutG(params[5], x)
+    x = mlpoutG(params[4], x)
     # Output should be an image
     return reshape(x, 64, 64, 3, batchsize)
 end
@@ -58,8 +57,7 @@ function mlpdiscriminator(params, moments, x, leak; training=true)
     x = mlp(params[1], x)
     x = mlp(params[2], x)
     x = mlp(params[3], x)
-    x = mlp(params[4], x)
-    return mlpoutD(params[5], x)
+    return mlpoutD(params[4], x)
 end
 
 # Below G and D are connected
