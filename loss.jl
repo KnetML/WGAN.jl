@@ -71,7 +71,7 @@ function traingan(zsize, atype, metric, clip)
         grad, loss = ganDgradloss(dparams, dmoments, dforw, x, generated, positive, negative, leak)
         update!(dparams, grad, opts)
         if metric == "wgan"
-            map!(clipfun, dparams)
+            map!(clipfun, dparams, dparams)
         end
         return loss
     end
@@ -84,7 +84,7 @@ function traingan(zsize, atype, metric, clip)
         grad, loss = ganGgradloss(gparams, dparams, gmoments, dmoments, gforw, dforw, z, positive, leak)
         update!(gparams, grad, opts)
         if metric == "wgan"
-            map!(clipfun, gparams)
+            map!(clipfun, gparams, gparams)
         end
         return loss
     end
