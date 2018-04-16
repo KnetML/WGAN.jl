@@ -8,26 +8,32 @@ function main(args)
     s.description = "WGAN Implementation in Knet"
 
     @add_arg_table s begin
-        ("--usegpu"; action=:store_true; help="use GPU or not")
+        ("--gpu"; arg_type=Int; default=0; help="GPU ID if -1 don't use GPU")
+        ("--dn"; arg_type=Int; default=1; help="Train discriminator n times")
         ("--type"; arg_type=String; default="dcganbn"; help="Type of model one of: [dcganbn (regular DCGAN), mlpg (Generator is MLP),
-        mlpgb (Both MLP), dcgan (Generator has no BN and has constant filter size)]")
+        mlpgd (Both MLP), dcgan (Generator has no BN and has constant filter size)]")
         ("--data"; arg_type=String; default="/home/cem/bedroom"; help="Dataset dir (processed)")
         ("--procedure"; arg_type=String; default="gan"; help="Training procedure. gan or wgan")
         ("--zsize"; arg_type=Int; default=100; help="Noise vector dimension")
         ("--epochs"; arg_type=Int; default=20; help="Number of training epochs")
         ("--report"; arg_type=Int; default=500; help="Report loss in n iterations")
         ("--batchsize"; arg_type=Int; default=64; help="Minibatch Size")
-        ("--lr"; arg_type=Any; default=0.0002; help="Learning rate")
-        ("--clip"; arg_type=Any; default=nothing; help="Clip value")
+        ("--lr"; arg_type=Float64; default=0.0002; help="Learning rate")
+        ("--clip"; arg_type=Float64; default=nothing; help="Clip value")
         ("--opt"; arg_type=String; default="adam"; help="Optimizer, one of: [adam, rmsprop]")
-        ("--leak"; arg_type=Any; default=0.2; help="LeakyReLU leak.")
+        ("--leak"; arg_type=Float64; default=0.2; help="LeakyReLU leak.")
         ("--out"; arg_type=String; default="/home/cem/WGAN.jl/models"; help="Output directory for saving model and generating images")
     end
 
     isa(args, AbstractString) && (args=split(args))
     o = parse_args(args, s; as_symbols=true)
 
-    atype = o[:usegpu] ? KnetArray{Float32} : Array{Float32}
+    gpuid = o[:gpu]
+    atype = gpuid >= 0 ? KnetArray{Float32} : Array{Float32}
+
+    if gpuid >= 0
+        gpu(gpuid)
+    end
 
     batchsize = o[:batchsize]
     procedure = o[:procedure]
@@ -38,6 +44,7 @@ function main(args)
     optimizer = o[:opt]
     lr = o[:lr]
     datadir = o[:data]
+    dn = o[:dn]
 
     myprint("Minibatch Size: $batchsize")
     myprint("Training Procedure: $procedure")
@@ -46,10 +53,14 @@ function main(args)
     myprint("Number of epochs: $numepoch")
     myprint("Using $optimizer with learning rate $lr")
     myprint("Dataset directory: $datadir")
+    myprint("Training discriminator $dn times")
 
-    o[:usegpu] ? myprint("Using GPU") : myprint("Not using GPU (why)")
+    myprint("Using GPU $gpuid")
 
     outdir = joinpath(o[:out], modeltype)
+    if procedure == "wgan"
+        outdir *= "_wgan"
+    end
     ispath(outdir) || mkdir(outdir)
 
     logdir = joinpath(outdir, "log.csv")
@@ -78,11 +89,11 @@ function main(args)
     myprint("Generator # of Parameters: $gnumparam")
     myprint("Discriminator # of Parameters: $dnumparam")
 
-    # Form optimiziers
+    # Form optimizers
     if optimizer == "adam"
         gopt = optimizers(gparams, Adam, lr=lr, beta1=0.5)
         dopt = optimizers(dparams, Adam, lr=lr, beta1=0.5)
-    elseif opt == "rmsprop"
+    elseif optimizer == "rmsprop"
         gopt = optimizers(gparams, Rmsprop, lr=lr)
         dopt = optimizers(dparams, Rmsprop, lr=lr)
     else:
@@ -113,15 +124,21 @@ function main(args)
             data = loadimgtensors(datadir, (chunk, upper))
             numelements += size(data, 1)
             batches = minibatch4(data, batchsize, atype)
-            myprint("Fitting chunks")
+            numexamples = length(batches)
+            myprint("Fitting chunks. Num steps: $numexamples")
 
-            for minibatch in batches
-                minibatch = atype(minibatch) # Put to GPU one by one so the memory won't explode
-                dloss = trainD(dparams, gparams, gmoments, dmoments, gforw, dforw, minibatch, dopt, leak)
+            for i=1:dn:numexamples
+                limit = min(i+dn-1, numexamples)
+                dbatches = batches[i:limit]
+                dloss = 0.0
+                for minibatch in dbatches
+                    minibatch = atype(minibatch)
+                    dloss += trainD(dparams, gparams, gmoments, dmoments, gforw, dforw, minibatch, dopt, leak)
+                end
                 gloss = trainG(gparams, dparams, gmoments, dmoments, gforw, dforw, batchsize, gopt, leak)
                 gtotalloss += gloss * batchsize
                 dtotalloss += dloss * batchsize
-                appendcsv(logdir, gloss, dloss)
+                appendcsv(logdir, gloss, dloss/dn)
            end
        end
 
@@ -142,5 +159,23 @@ function main(args)
     myprint("Done. Exiting...")
     return 0
 end
-# lr=0.0002 for regular gan
-main("--usegpu --type dcganbn --precedure wgan --clip 0.01 --lr 0.00005")
+
+main(ARGS)
+# ===GAN: DCGAN===
+# julia train.jl --gpu 0 --type dcganbn
+# ===GAN: Generator with no batch norm===
+# julia train.jl --gpu 1 --type dcgan
+# ===GAN: Generator MLP===
+# julia train.jl --gpu 2 --type mlpg
+# ===GAN: Both MLP===
+# julia train.jl --gpu 3 --type mlpgd
+
+
+# ===WGAN: DCGAN===
+# julia train.jl --gpu 0 --type dcganbn --procedure wgan --clip 0.01 --lr 0.00005 --opt rmsprop --dn 5
+# ===WGAN: Generator with no batch norm===
+# julia train.jl --gpu 1 --type dcgan --procedure wgan --clip 0.01 --lr 0.00005 --opt rmsprop --dn 5
+# ===WGAN: Generator MLP===
+# julia train.jl --gpu 2 --type mlpg --procedure wgan --clip 0.01 --lr 0.00005 --opt rmsprop --dn 5
+# ===WGAN: Both MLP===
+# julia train.jl --gpu 3 --type mlpgd --procedure wgan --clip 0.01 --lr 0.00005 --opt rmsprop --dn 5

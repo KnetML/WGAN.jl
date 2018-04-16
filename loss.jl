@@ -46,7 +46,7 @@ ganDgradloss = gradloss(ganDloss)
 wganGgradloss = gradloss(wganGloss)
 wganDgradloss = gradloss(wganDloss)
 
-function traingan(zsize, atype, metric; clip=nothing)
+function traingan(zsize, atype, metric, clip)
     """
     zsize: Noise size
     atype: Array type
@@ -88,15 +88,15 @@ function traingan(zsize, atype, metric; clip=nothing)
         end
         return loss
     end
-
     return trainD, trainG
 end
 
 function clipper(clip, atype)
-    function clip(param):
-        if atype == KnetArray{Float32}:
+    function clipfun(param)
+        if atype == KnetArray{Float32}
             param = Array{Float32}(param)
+        end
         return atype(clamp.(param, -clip, clip))
     end
-    return clip
+    return clipfun
 end
