@@ -4,6 +4,9 @@ include("params.jl")
 using Knet
 
 function dcgeneratorbn(params, moments, x; training=true)
+    """
+    Deep Convolutional Generator With Batch Notmalization
+    """
     x = dcGbn_input(params[1:2], moments[1], x, training)
     x = dcGbn_hidden(params[3:4], moments[2], x, training)
     x = dcGbn_hidden(params[5:6], moments[3], x, training)
@@ -13,6 +16,7 @@ end
 
 function dcgenerator(params, moments, x; training=true)
     """
+    Deep Convolutional Generator without Batch Normalization
     Moments and training stay here in order to use other functions
     in a generic way.
     """
@@ -24,6 +28,9 @@ function dcgenerator(params, moments, x; training=true)
 end
 
 function dcdiscriminator(params, moments, x, leak; training=true)
+    """
+    Deep Convolutional Discriminator
+    """
     x = dcD(params[1:2], moments[1], x, leak, training)
     x = dcD(params[3:4], moments[2], x, leak, training)
     x = dcD(params[5:6], moments[3], x, leak, training)
@@ -33,6 +40,7 @@ end
 
 function mlpgenerator(params, moments, x; training=true)
     """
+    MLP-ReLU Generator
     Moments and training stay here in order to use other functions
     in a generic way. Input is 4D (1,1,zsize,N) squeeze it
     """
@@ -50,6 +58,7 @@ end
 
 function mlpdiscriminator(params, moments, x, leak; training=true)
     """
+    MLP-ReLU Discriminator
     Moments and training stay here in order to use other functions
     in a generic way. Input is 4D 64,64,3,N. Make input 2D 64x64x3,N
     """

@@ -16,8 +16,9 @@ function main(args)
         ("--zsize"; arg_type=Int; default=100; help="Noise vector dimension")
         ("--epochs"; arg_type=Int; default=20; help="Number of training epochs")
         ("--report"; arg_type=Int; default=500; help="Report loss in n iterations")
-        ("--batchsize"; arg_type=Int; default=128; help="Minibatch Size")
-        ("--lr"; arg_type=Any; default=0.00005; help="Learning rate")
+        ("--batchsize"; arg_type=Int; default=64; help="Minibatch Size")
+        ("--lr"; arg_type=Any; default=0.0002; help="Learning rate")
+        ("--clip"; arg_type=Any; default=nothing; help="Clip value")
         ("--opt"; arg_type=String; default="adam"; help="Optimizer, one of: [adam, rmsprop]")
         ("--leak"; arg_type=Any; default=0.2; help="LeakyReLU leak.")
         ("--out"; arg_type=String; default="/home/cem/WGAN.jl/models"; help="Output directory for saving model and generating images")
@@ -95,8 +96,7 @@ function main(args)
 
     modelpath = joinpath(outdir, "model.jld")
 
-    trainers = procedure == "gan" ? traingan : traingan # TODO: trainwgan
-    trainD, trainG = trainers(zsize, atype)
+    trainD, trainG = traingan(zsize, atype, procedure, o[:clip])
 
     numchunks = getnumchunks(datadir)
     myprint("Number of chunks: $numchunks")
@@ -118,7 +118,7 @@ function main(args)
             for minibatch in batches
                 minibatch = atype(minibatch) # Put to GPU one by one so the memory won't explode
                 dloss = trainD(dparams, gparams, gmoments, dmoments, gforw, dforw, minibatch, dopt, leak)
-                gloss = trainG(gparams, dparams, gmoments, dmoments, gforw, dforw, minibatch, gopt, leak)
+                gloss = trainG(gparams, dparams, gmoments, dmoments, gforw, dforw, batchsize, gopt, leak)
                 gtotalloss += gloss * batchsize
                 dtotalloss += dloss * batchsize
                 appendcsv(logdir, gloss, dloss)
@@ -142,5 +142,5 @@ function main(args)
     myprint("Done. Exiting...")
     return 0
 end
-
-main("--usegpu --type mlpgd")
+# lr=0.0002 for regular gan
+main("--usegpu --type dcganbn --precedure wgan --clip 0.01 --lr 0.00005")
