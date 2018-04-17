@@ -12,39 +12,29 @@ function binaryxentropy(logits, gold; average=true)
     return loss
 end
 
-# Regular GAN Metric
-function ganDloss(dparams, dmoments, dforw, real, fake, positive, negative, leak)
+function ganDloss(dparams, dmoments, dforw, real, fake, positive, negative, leak, metric)
     realclss = mat(dforw(dparams, dmoments, real, leak))
     fakeclss = mat(dforw(dparams, dmoments, fake, leak))
-    return binaryxentropy(realclss, positive) + binaryxentropy(fakeclss, negative)
+    if metric == "gan"
+        return binaryxentropy(realclss, positive) + binaryxentropy(fakeclss, negative)
+    else
+        return mean(realclss, 2)[1][1] - mean(fakeclss, 2)[1][1]
+    end
 end
 
-function ganGloss(gparams, dparams, gmoments, dmoments, gforw, dforw, z, positive, leak)
+function ganGloss(gparams, dparams, gmoments, dmoments, gforw, dforw, z, positive, leak, metric)
     fakeimg = gforw(gparams, gmoments, z)
     fakeclss = mat(dforw(dparams, dmoments, fakeimg, leak))
-    return binaryxentropy(fakeclss, positive)
-end
-
-# Wasserstein Metric
-# These losses direcly take the mean scores along the batches i.e second dimension
-function wganDloss(dparams, dmoments, dforw, real, fake, positive, negative, leak)
-    realclss = mat(dforw(dparams, dmoments, real, leak))
-    fakeclss = mat(dforw(dparams, dmoments, fake, leak))
-    return mean(realclss, 2) - mean(fakeclss, 2)
-end
-
-function wganGloss(gparams, dparams, gmoments, dmoments, gforw, dforw, z, positive, leak)
-    fakeimg = gforw(gparams, gmoments, z)
-    fakeclss = mat(dforw(dparams, dmoments, fakeimg, leak))
-    return mean(fakeclss, 2)
+    if metric == "gan"
+        return binaryxentropy(fakeclss, positive)
+    else
+        return mean(fakeclss, 2)[1][1]
+    end
 end
 
 # Gradient functions
 ganGgradloss = gradloss(ganGloss)
 ganDgradloss = gradloss(ganDloss)
-
-wganGgradloss = gradloss(wganGloss)
-wganDgradloss = gradloss(wganDloss)
 
 function traingan(zsize, atype, metric, clip)
     """
@@ -68,7 +58,7 @@ function traingan(zsize, atype, metric, clip)
         z = samplenoise4(zsize, batchsize, atype)
 
         generated = gforw(gparams, gmoments, z)
-        grad, loss = ganDgradloss(dparams, dmoments, dforw, x, generated, positive, negative, leak)
+        grad, loss = ganDgradloss(dparams, dmoments, dforw, x, generated, positive, negative, leak, metric)
         update!(dparams, grad, opts)
         if metric == "wgan"
             map!(clipfun, dparams, dparams)
@@ -81,7 +71,7 @@ function traingan(zsize, atype, metric, clip)
         negative = atype(zeros(1, batchsize))
         z = samplenoise4(zsize, batchsize, atype)
 
-        grad, loss = ganGgradloss(gparams, dparams, gmoments, dmoments, gforw, dforw, z, positive, leak)
+        grad, loss = ganGgradloss(gparams, dparams, gmoments, dmoments, gforw, dforw, z, positive, leak, metric)
         update!(gparams, grad, opts)
         if metric == "wgan"
             map!(clipfun, gparams, gparams)
