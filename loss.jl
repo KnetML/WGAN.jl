@@ -18,7 +18,7 @@ function ganDloss(dparams, dmoments, dforw, real, fake, positive, negative, leak
     if metric == "gan"
         return binaryxentropy(realclss, positive) + binaryxentropy(fakeclss, negative)
     else
-        return mean(realclss, 2)[1][1] - mean(fakeclss, 2)[1][1]
+        return mean(sigm.(realclss), 2)[1][1] - mean(sigm.(fakeclss), 2)[1][1]
     end
 end
 
@@ -28,7 +28,7 @@ function ganGloss(gparams, dparams, gmoments, dmoments, gforw, dforw, z, positiv
     if metric == "gan"
         return binaryxentropy(fakeclss, positive)
     else
-        return mean(fakeclss, 2)[1][1]
+        return mean(sigm.(fakeclss), 2)[1][1]
     end
 end
 

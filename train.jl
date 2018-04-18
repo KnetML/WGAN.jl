@@ -142,7 +142,7 @@ function main(args)
            end
        end
 
-       gtotalloss /= numelements
+       gtotalloss /= (numelements/dn)
        dtotalloss /= numelements
        elapsed = 0
 
