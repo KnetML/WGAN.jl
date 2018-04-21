@@ -48,10 +48,10 @@ function mlpgenerator(params, moments, x; training=true)
     zsize = size(x, 3)
 
     x = mat(x)
-    x = mlp(params[1], x)
-    x = mlp(params[2], x)
-    x = mlp(params[3], x)
-    x = mlpoutG(params[4], x)
+    x = mlp(params[1:2], x)
+    x = mlp(params[3:4], x)
+    x = mlp(params[5:6], x)
+    x = mlpoutG(params[7:8], x)
     # Output should be an image
     return reshape(x, 64, 64, 3, batchsize)
 end
@@ -63,10 +63,10 @@ function mlpdiscriminator(params, moments, x, leak; training=true)
     in a generic way. Input is 4D 64,64,3,N. Make input 2D 64x64x3,N
     """
     x = mat(x)
-    x = mlp(params[1], x)
-    x = mlp(params[2], x)
-    x = mlp(params[3], x)
-    return mlpoutD(params[4], x)
+    x = mlp(params[1:2], x)
+    x = mlp(params[3:4], x)
+    x = mlp(params[5:6], x)
+    return mlpoutD(params[7:8], x)
 end
 
 # Below G and D are connected

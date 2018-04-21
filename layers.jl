@@ -47,17 +47,17 @@ end
 
 # Common MLP layer
 function mlp(w, x)
-    return relu.(w * x)
+    return relu.(w[1] * x .+ w[2])
 end
 
 # Discriminator MLP output layer
 function mlpoutD(w, x)
-    return w * x
+    return w[1] * x .+ w[2]
 end
 
 # Generator MLP output layer
 function mlpoutG(w, x)
-    return tanh.(w * x)
+    return tanh.(w[1] * x .+ w[2])
 end
 
 function leakyrelu(x, alpha)

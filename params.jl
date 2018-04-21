@@ -37,11 +37,15 @@ end
 
 function mlpGinit(atype, winit, hiddensize, zsize)
     w1 = winit(hiddensize, zsize)
+    b1 = zeros(hiddensize, 1)
     w2 = winit(hiddensize, hiddensize)
+    b2 = zeros(hiddensize, 1)
     w3 = winit(hiddensize, hiddensize)
+    b3 = zeros(hiddensize, 1)
     w4 = winit(64*64*3, hiddensize)
+    b4 = zeros(64*64*3, 1)
 
-    params = atype.([w1,w2,w3,w4])
+    params = atype.([w1,b1,w2,b2,w3,b3,w4,b4])
     return params
 end
 
@@ -71,10 +75,14 @@ end
 
 function mlpDinit(atype, winit, hiddensize)
     w1 = winit(hiddensize, 64*64*3)
+    b1 = zeros(hiddensize, 1)
     w2 = winit(hiddensize, hiddensize)
+    b2 = zeros(hiddensize, 1)
     w3 = winit(hiddensize, hiddensize)
+    b3 = zeros(hiddensize, 1)
     w4 = winit(1, hiddensize)
+    b4 = zeros(1, 1)
 
-    params = atype.([w1,w2,w3,w4])
+    params = atype.([w1,b1,w2,b2,w3,b3,w4,b4])
     return params
 end
