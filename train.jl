@@ -117,6 +117,7 @@ function main(args)
         numelements = 0
         gtotalloss = 0.0
         dtotalloss = 0.0
+        geniter = 0
 
         for chunk in 1:20:numchunks
             upper = min(numchunks, chunk+20-1) # TODO: Read this from sys args
@@ -126,23 +127,34 @@ function main(args)
             batches = minibatch4(data, batchsize, atype)
             numexamples = length(batches)
             myprint("Fitting chunks. Num steps: $numexamples")
+            i = 1
+            while i <= numexamples
 
-            for i=1:dn:numexamples
-                limit = min(i+dn-1, numexamples)
+                if geniter < 25 || geniter % 500 == 0
+                    Diters = 100
+                else
+                    Diters = dn
+                end
+
+                limit = min(i+Diters-1, numexamples)
+                i += Diters
                 dbatches = batches[i:limit]
                 dloss = 0.0
+
                 for minibatch in dbatches
                     minibatch = atype(minibatch)
                     dloss += trainD(dparams, gparams, gmoments, dmoments, gforw, dforw, minibatch, dopt, leak)
                 end
+
                 gloss = trainG(gparams, dparams, gmoments, dmoments, gforw, dforw, batchsize, gopt, leak)
+                geniter += 1
                 gtotalloss += gloss * batchsize
                 dtotalloss += dloss * batchsize
-                appendcsv(logdir, gloss, dloss/dn)
+                appendcsv(logdir, gloss, dloss/Diters)
            end
        end
 
-       gtotalloss /= (numelements/dn)
+       gtotalloss /= (batchsize*geniter)
        dtotalloss /= numelements
        elapsed = 0
 
