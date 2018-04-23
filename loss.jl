@@ -63,7 +63,7 @@ function traingan(zsize, atype, metric, clip)
         update!(dparams, grad, opts)
 
         metric == "wgan" && map!(clipfun, dparams, dparams)
-        
+
         return loss
     end
 
@@ -73,7 +73,7 @@ function traingan(zsize, atype, metric, clip)
         z = samplenoise4(zsize, batchsize, atype)
 
         grad, loss = ganGgradloss(gparams, dparams, gmoments, dmoments, gforw, dforw, z, positive, leak, metric)
-        metric == "wgan" && grad *= -1
+        metric == "wgan" && (grad *= -1)
         update!(gparams, grad, opts)
 
         return loss
