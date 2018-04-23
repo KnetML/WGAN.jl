@@ -3,4 +3,52 @@
 This repository contains implementation of [WGAN](https://arxiv.org/abs/1701.07875) in Julia
 using [Knet](https://github.com/denizyuret/Knet.jl).  
 
-Stay tuned for further details!
+## Usage
+
+```
+usage: train.jl [--gpu GPU] [--dn DN] [--type TYPE] [--data DATA]
+                [--procedure PROCEDURE] [--zsize ZSIZE]
+                [--epochs EPOCHS] [--report REPORT]
+                [--batchsize BATCHSIZE] [--lr LR] [--clip CLIP]
+                [--opt OPT] [--leak LEAK] [--out OUT] [-h]
+
+WGAN Implementation in Knet
+
+optional arguments:
+  --gpu GPU             GPU ID if -1 don't use GPU (type: Int64,
+                        default: 0)
+  --dn DN               Train discriminator n times (type: Int64,
+                        default: 1)
+  --type TYPE           Type of model one of: [dcganbn (regular
+                        DCGAN), mlpg (Generator is MLP),         mlpgd
+                        (Both MLP), dcgan (Generator has no BN and has
+                        constant filter size)] (default: "dcganbn")
+  --data DATA           Dataset dir (processed) (default:
+                        "/home/cem/bedroom")
+  --procedure PROCEDURE
+                        Training procedure. gan or wgan (default:
+                        "gan")
+  --zsize ZSIZE         Noise vector dimension (type: Int64, default:
+                        100)
+  --epochs EPOCHS       Number of training epochs (type: Int64,
+                        default: 20)
+  --report REPORT       Report loss in n iterations (type: Int64,
+                        default: 500)
+  --batchsize BATCHSIZE
+                        Minibatch Size (type: Int64, default: 64)
+  --lr LR               Learning rate (type: Float64, default: 0.0002)
+  --clip CLIP           Clip value (type: Float64)
+  --opt OPT             Optimizer, one of: [adam, rmsprop] (default:
+                        "adam")
+  --leak LEAK           LeakyReLU leak. (type: Float64, default: 0.2)
+  --out OUT             Output directory for saving model and
+                        generating images (default:
+                        "/home/cem/WGAN.jl/models")
+  -h, --help            show this help message and exit
+  ```
+  
+  ## Learning Curves and Outputs
+  
+  ### Standard GAN
+  
+  ### Wasserstein GAN
