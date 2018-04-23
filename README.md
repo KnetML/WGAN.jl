@@ -1,6 +1,6 @@
 # Wasserstein GAN
 
-This repository contains implementation of [WGAN](https://arxiv.org/abs/1701.07875) [DCGAN](https://arxiv.org/abs/1511.06434) in [Julia](https://julialang.org/)
+This repository contains implementation of [WGAN](https://arxiv.org/abs/1701.07875) and [DCGAN](https://arxiv.org/abs/1511.06434) in [Julia](https://julialang.org/)
 using [Knet](https://github.com/denizyuret/Knet.jl).  
 
 ## Usage
