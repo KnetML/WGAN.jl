@@ -2,5 +2,5 @@
 *.png
 *.log
 *.out
+models/*
 !models/README.md
-models
