@@ -22,7 +22,7 @@ function main(args)
         ("--clip"; arg_type=Float64; default=nothing; help="Clip value")
         ("--opt"; arg_type=String; default="adam"; help="Optimizer, one of: [adam, rmsprop]")
         ("--leak"; arg_type=Float64; default=0.2; help="LeakyReLU leak.")
-        ("--out"; arg_type=String; default="/home/cem/WGAN.jl/models"; help="Output directory for saving model and generating images")
+        ("--out"; arg_type=String; default="./models"; help="Output directory for saving model and generating images")
     end
 
     isa(args, AbstractString) && (args=split(args))
@@ -95,7 +95,12 @@ function main(args)
         dopt = optimizers(dparams, Adam, lr=lr, beta1=0.5)
     elseif optimizer == "rmsprop"
         gopt = optimizers(gparams, Rmsprop, lr=lr)
-        dopt = optimizers(dparams, Rmsprop, lr=lr)
+        if procedure == "wgan"
+            println("Discriminator, gradient ascent")
+            dopt = optimizers(dparams, Rmsprop, lr=-lr)
+        else
+            dopt = optimizers(dparams, Rmsprop, lr=lr)
+        end
     else:
         throw(ArgumentError("Unknown optimizer"))
     end
@@ -113,31 +118,25 @@ function main(args)
     myprint("Number of chunks: $numchunks")
 
     myprint("Started Training...")
+
     for epoch in 1:numepoch
         numelements = 0
         gtotalloss = 0.0
         dtotalloss = 0.0
         geniter = 0
 
-        for chunk in 1:20:numchunks
-            upper = min(numchunks, chunk+20-1) # TODO: Read this from sys args
+        for chunk in 1:30:numchunks
+            upper = min(numchunks, chunk+30-1) # TODO: Read this from sys args
             myprint("Loading chunks: ($chunk, $upper)")
             data = loadimgtensors(datadir, (chunk, upper))
             numelements += size(data, 1)
             batches = minibatch4(data, batchsize, atype)
             numexamples = length(batches)
             myprint("Fitting chunks. Num steps: $numexamples")
-            i = 1
-            while i <= numexamples
 
-                if geniter < 25 || geniter % 500 == 0
-                    Diters = 100
-                else
-                    Diters = dn
-                end
+            for i=1:dn:numexamples
 
-                limit = min(i+Diters-1, numexamples)
-                i += Diters
+                limit = min(i+dn-1, numexamples)
                 dbatches = batches[i:limit]
                 dloss = 0.0
 
@@ -150,7 +149,7 @@ function main(args)
                 geniter += 1
                 gtotalloss += gloss * batchsize
                 dtotalloss += dloss * batchsize
-                appendcsv(logdir, gloss, dloss/Diters)
+                appendcsv(logdir, gloss, dloss/dn)
            end
        end
 
@@ -184,10 +183,10 @@ main(ARGS)
 
 
 # ===WGAN: DCGAN===
-# julia train.jl --gpu 0 --type dcganbn --procedure wgan --clip 0.01 --lr 0.00005 --opt rmsprop --dn 5
+# julia train.jl --gpu 0 --type dcganbn --procedure wgan --clip 0.01 --lr 0.00005 --opt rmsprop --dn 5 --epochs 30
 # ===WGAN: Generator with no batch norm===
-# julia train.jl --gpu 1 --type dcgan --procedure wgan --clip 0.01 --lr 0.00005 --opt rmsprop --dn 5
+# julia train.jl --gpu 1 --type dcgan --procedure wgan --clip 0.01 --lr 0.00005 --opt rmsprop --dn 5 --epochs 30
 # ===WGAN: Generator MLP===
-# julia train.jl --gpu 2 --type mlpg --procedure wgan --clip 0.01 --lr 0.00005 --opt rmsprop --dn 5
+# julia train.jl --gpu 2 --type mlpg --procedure wgan --clip 0.01 --lr 0.00005 --opt rmsprop --dn 5 --epochs 30
 # ===WGAN: Both MLP===
-# julia train.jl --gpu 3 --type mlpgd --procedure wgan --clip 0.01 --lr 0.00005 --opt rmsprop --dn 5
+# julia train.jl --gpu 3 --type mlpgd --procedure wgan --clip 0.01 --lr 0.00005 --opt rmsprop --dn 5 --epochs 30

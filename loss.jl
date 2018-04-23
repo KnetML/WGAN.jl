@@ -28,7 +28,7 @@ function ganGloss(gparams, dparams, gmoments, dmoments, gforw, dforw, z, positiv
     if metric == "gan"
         return binaryxentropy(fakeclss, positive)
     else
-        return -mean(fakeclss, 2)[1][1]
+        return mean(fakeclss, 2)[1][1]
     end
 end
 
@@ -45,6 +45,7 @@ function traingan(zsize, atype, metric, clip)
     clip must be provided.
     """
     metric = lowercase(metric)
+
     if metric == "wgan"
         @assert clip != nothing
         clipfun = clipper(clip, atype)
@@ -59,10 +60,10 @@ function traingan(zsize, atype, metric, clip)
 
         generated = gforw(gparams, gmoments, z)
         grad, loss = ganDgradloss(dparams, dmoments, dforw, x, generated, positive, negative, leak, metric)
-        metric == "wgan" ? update!(dparams, -grad, opts) : update!(dparams, grad, opts)
-        if metric == "wgan"
-            map!(clipfun, dparams, dparams)
-        end
+        update!(dparams, grad, opts)
+
+        metric == "wgan" && map!(clipfun, dparams, dparams)
+        
         return loss
     end
 
@@ -72,11 +73,9 @@ function traingan(zsize, atype, metric, clip)
         z = samplenoise4(zsize, batchsize, atype)
 
         grad, loss = ganGgradloss(gparams, dparams, gmoments, dmoments, gforw, dforw, z, positive, leak, metric)
+        metric == "wgan" && grad *= -1
         update!(gparams, grad, opts)
-        # Don't clip generator parameters
-        #if metric == "wgan"
-        #    map!(clipfun, gparams, gparams)
-        #end
+
         return loss
     end
     return trainD, trainG
