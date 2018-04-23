@@ -5,6 +5,8 @@ using [Knet](https://github.com/denizyuret/Knet.jl).
 
 ## Usage
 
+Just run ```julia train.jl``` with the following arguments. Note that if procedure is ```gan``` discriminator weights won't get clipped.
+
 ```
 usage: train.jl [--gpu GPU] [--dn DN] [--type TYPE] [--data DATA]
                 [--procedure PROCEDURE] [--zsize ZSIZE]
