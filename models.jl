@@ -3,6 +3,10 @@ include("layers.jl")
 include("params.jl")
 using Knet
 
+function myinit(a...)
+    return gaussian(a..., mean=0.0, std=0.02)
+end
+
 function dcgeneratorbn(params, moments, x; training=true)
     """
     Deep Convolutional Generator With Batch Notmalization
@@ -31,11 +35,11 @@ function dcdiscriminator(params, moments, x, leak; training=true)
     """
     Deep Convolutional Discriminator
     """
-    x = dcD(params[1:2], moments[1], x, leak, training)
-    x = dcD(params[3:4], moments[2], x, leak, training)
-    x = dcD(params[5:6], moments[3], x, leak, training)
-    x = dcD(params[7:8], moments[4], x, leak, training)
-    return dcDout(params[9], x)
+    x = dcD_in(params[1], x, leak)
+    x = dcD(params[2:3], moments[1], x, leak, training)
+    x = dcD(params[4:5], moments[2], x, leak, training)
+    x = dcD(params[6:7], moments[3], x, leak, training)
+    return dcDout(params[8], x)
 end
 
 function mlpgenerator(params, moments, x; training=true)
@@ -71,7 +75,7 @@ end
 
 # Below G and D are connected
 
-function dcganbnorm(leak, zsize, atype; winit=xavier)
+function dcganbnorm(leak, zsize, atype; winit=myinit)
     """
     Regular DCGAN
     """
@@ -80,29 +84,30 @@ function dcganbnorm(leak, zsize, atype; winit=xavier)
     return (gparams, gmoments, dcgeneratorbn), (dparams, dmoments, dcdiscriminator)
 end
 
-function dcgan(leak, zsize, atype; winit=xavier)
+function dcgan(leak, zsize, atype; winit=myinit)
     """
     DCGAN, but generator do not have batch normalization and has constant filter size
     """
-    gparams = dcGinit(atype, winit, 256, zsize)
+    gparams = dcGinit(atype, winit, 64, zsize)
     dparams, dmoments = dcDinitbn(atype, winit)
-    return (gparams, nothing, dcgenerator), (dparams, dmoments, dcdiscriminator)
+    return (gparams, [], dcgenerator), (dparams, dmoments, dcdiscriminator)
 end
 
-function mlpg(leak, zsize, atype; winit=xavier)
+function mlpg(leak, zsize, atype; winit=myinit)
     """
     Generator is an MLP, discriminator is DCGAN
     """
-    gparams = mlpGinit(atype, winit, 512, zsize)
+    gparams = mlpGinit(atype, 512, zsize)
     dparams, dmoments = dcDinitbn(atype, winit)
-    return (gparams, nothing, mlpgenerator), (dparams, dmoments, dcdiscriminator)
+    return (gparams, [], mlpgenerator), (dparams, dmoments, dcdiscriminator)
 end
 
-function mlpgd(leak, zsize, atype; winit=xavier)
+function mlpgd(leak, zsize, atype; winit=myinit)
     """
     leak stay here in order to use other functions in a generic way.
     """
-    gparams = mlpGinit(atype, winit, 512, zsize)
-    dparams = mlpDinit(atype, winit, 512)
-    return (gparams, nothing, mlpgenerator), (dparams, nothing, mlpdiscriminator)
+    println("I'm mlpgd")
+    gparams = mlpGinit(atype, 512, zsize)
+    dparams = mlpDinit(atype, 512)
+    return (gparams, [], mlpgenerator), (dparams, [], mlpdiscriminator)
 end

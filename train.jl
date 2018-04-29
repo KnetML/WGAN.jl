@@ -95,12 +95,7 @@ function main(args)
         dopt = optimizers(dparams, Adam, lr=lr, beta1=0.5)
     elseif optimizer == "rmsprop"
         gopt = optimizers(gparams, Rmsprop, lr=lr)
-        if procedure == "wgan"
-            println("Discriminator, gradient ascent")
-            dopt = optimizers(dparams, Rmsprop, lr=-lr)
-        else
-            dopt = optimizers(dparams, Rmsprop, lr=lr)
-        end
+        dopt = optimizers(dparams, Rmsprop, lr=lr)
     else:
         throw(ArgumentError("Unknown optimizer"))
     end
@@ -118,6 +113,7 @@ function main(args)
     myprint("Number of chunks: $numchunks")
 
     myprint("Started Training...")
+    genitertotal = 0
 
     for epoch in 1:numepoch
         numelements = 0
@@ -133,23 +129,30 @@ function main(args)
             batches = minibatch4(data, batchsize, atype)
             numexamples = length(batches)
             myprint("Fitting chunks. Num steps: $numexamples")
+            i = 1
+            while i <= numexamples
+                if genitertotal < 25 || genitertotal % 500 == 0
+                    Diters = 100
+                else
+                    Diters = dn
+                end
 
-            for i=1:dn:numexamples
-
-                limit = min(i+dn-1, numexamples)
+                limit = min(i+Diters-1, numexamples)
                 dbatches = batches[i:limit]
                 dloss = 0.0
 
                 for minibatch in dbatches
                     minibatch = atype(minibatch)
-                    dloss += trainD(dparams, gparams, gmoments, dmoments, gforw, dforw, minibatch, dopt, leak)
+                    dloss += trainD(dparams, gparams, gmoments, dmoments, gforw, dforw, minibatch, dopt, leak, batchsize)
+                    i += 1
                 end
 
                 gloss = trainG(gparams, dparams, gmoments, dmoments, gforw, dforw, batchsize, gopt, leak)
                 geniter += 1
+                genitertotal += 1
                 gtotalloss += gloss * batchsize
                 dtotalloss += dloss * batchsize
-                appendcsv(logdir, gloss, dloss/dn)
+                appendcsv(logdir, gloss, dloss/length(dbatches))
            end
        end
 

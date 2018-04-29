@@ -65,6 +65,21 @@ function processimgs(basedir::String, bsize::Int, outdir::String;
     end
 end
 
+function normalize4(inp, means, stds)
+    # Saved tensors are normalized between -1 and 1. This is a hacky thing FIXME
+    inp = normalize(inp, 0, 1)
+    for i=1:size(inp, 1) # For each image
+        for c=1:3 # Normalize each channel seperately
+            inp[i,:,:,c] = (inp[i,:,:,c] .- means[c]) ./ stds[c]
+        end
+    end
+    return inp
+end
+
+function denormalize(inp)
+    return (inp .* 0.5) .+ 0.5
+end
+
 function samplenoise4(size, n, atype)
     """
     Outputs gaussian noise with size (1, 1, size, n)
@@ -103,6 +118,7 @@ function loadimgtensors(basedir::String, idxs::Tuple{Int, Int})
         # myprint("Loading $dir")
         loadtensor(joinpath(basedir, dir))
     end
+    # return normalize4(imgs, [0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
     return imgs
 end
 
