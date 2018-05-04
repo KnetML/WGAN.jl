@@ -1,33 +1,34 @@
 using Knet
 
-function mybn(channels, mean=1.0, std=0.02)
-    bnpars = bnparams(channels)
-    bnpars[1:channels] = randn(channels) .* std .+ mean
-    return bnpars
-end
+# function mlpinit(out, in)
+#     stdv = 1/sqrt(out)
+#     W = stdv * (rand(out,in) * 2 - 1)
+#     b = stdv * (rand(out, 1) * 2 - 1)
+#     return W, b
+# end
 
 function mlpinit(out, in)
-    w = xavier(out, in)
-    b = zeros(out, 1)
-    return w, b
+    W = xavier(out,in)
+    b = xavier(out, 1)
+    return W, b
 end
 
 function dcGinitbn(atype, winit, zsize)
     w1 = winit(4, 4, 512, zsize)
     m1 = bnmoments()
-    b1 = mybn(512)
+    b1 = bnparams(512)
 
     w2 = winit(4, 4, 256, 512)
     m2 = bnmoments()
-    b2 = mybn(256)
+    b2 = bnparams(256)
 
     w3 = winit(4, 4, 128, 256)
     m3 = bnmoments()
-    b3 = mybn(128)
+    b3 = bnparams(128)
 
     w4 = winit(4, 4, 64, 128)
     m4 = bnmoments()
-    b4 = mybn(64)
+    b4 = bnparams(64)
 
     w5 = winit(4, 4, 3, 64)
 
@@ -62,15 +63,15 @@ function dcDinitbn(atype, winit)
 
     w2 = winit(4, 4, 64, 128)
     m2 = bnmoments()
-    b2 = mybn(128)
+    b2 = bnparams(128)
 
     w3 = winit(4, 4, 128, 256)
     m3 = bnmoments()
-    b3 = mybn(256)
+    b3 = bnparams(256)
 
     w4 = winit(4, 4, 256, 512)
     m4 = bnmoments()
-    b4 = mybn(512)
+    b4 = bnparams(512)
 
     w5 = winit(4, 4, 512, 1)
 

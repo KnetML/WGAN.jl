@@ -4,3 +4,4 @@
 *.out
 models/*
 !models/README.md
+*_lmdb

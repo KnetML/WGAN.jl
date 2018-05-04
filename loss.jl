@@ -1,8 +1,7 @@
 using Knet
 
-function clipfun(x0, minval, maxval)
-    x1 = max.(minval, x0)
-    x2 = min.(maxval, x1)
+function clipfun(param, minval, maxval)
+    KnetArray{Float32}(clamp.(Array{Float32}(param), minval, maxval))
 end
 
 function binaryxentropy(logits, gold; average=true)
@@ -23,14 +22,9 @@ function ganDloss(dparams, dmoments, dforw, real, fake, positive, negative, leak
     return binaryxentropy(realclss, positive) + binaryxentropy(fakeclss, negative)
 end
 
-function wganDloss_real(dparams, dmoments, dforw, real, leak)
-    realclss = mat(dforw(dparams, dmoments, real, leak))
-    return mean(realclss)
-end
-
-function wganDloss_fake(dparams, dmoments, dforw, fake, leak)
-    fakeclss = mat(dforw(dparams, dmoments, fake, leak))
-    return mean(fakeclss)
+function wganDloss(dparams, dmoments, dforw, input, leak)
+    clss = dforw(dparams, dmoments, input, leak)
+    return mean(clss)
 end
 
 function ganGloss(gparams, dparams, gmoments, dmoments, gforw, dforw, z, positive, leak)
@@ -49,8 +43,7 @@ end
 ganGgradloss = gradloss(ganGloss)
 ganDgradloss = gradloss(ganDloss)
 wganGgradloss = gradloss(wganGloss)
-wganDgradloss_fake = gradloss(wganDloss_fake)
-wganDgradloss_real = gradloss(wganDloss_real)
+wganDgradloss = gradloss(wganDloss)
 
 function traingan(zsize, atype, metric, clip)
     """
@@ -62,8 +55,8 @@ function traingan(zsize, atype, metric, clip)
     """
     metric = lowercase(metric)
 
-    function trainD(dparams, gparams, gmoments, dmoments, gforw, dforw, x, opts, leak, batchsize)
-        # batchsize = size(x)[end]
+    function trainD(dparams, gparams, gmoments, dmoments, gforw, dforw, x, opts, leak)
+        batchsize = size(x)[end]
         z = samplenoise4(zsize, batchsize, atype)
         generated = gforw(gparams, gmoments, z)
 
@@ -71,12 +64,11 @@ function traingan(zsize, atype, metric, clip)
             for i = 1:length(dparams)
                 dparams[i] = clipfun(dparams[i], -clip, clip)
             end
-
-            grad_real, loss_real = wganDgradloss_real(dparams, dmoments, dforw, x, leak)
-            grad_fake, loss_fake = wganDgradloss_fake(dparams, dmoments, dforw, generated, leak)
-
+            grad_real, loss_real = wganDgradloss(dparams, dmoments, dforw, x, leak)
+            grad_fake, loss_fake = wganDgradloss(dparams, dmoments, dforw, generated, leak)
             grad = grad_real - grad_fake
-            loss = loss_real - loss_fake
+            # gradcheck(wganDloss, dparams, dmoments, dforw, generated, x, leak, atol=0.1, verbose=true, gcheck=100)
+            loss = loss_real, loss_fake
         elseif metric == "gan"
             positive = atype(ones(1, batchsize))
             negative = atype(zeros(1, batchsize))
@@ -84,9 +76,9 @@ function traingan(zsize, atype, metric, clip)
         else
             throw(ArgumentError("Unknown metric"))
         end
-        # println("D grad mean")
-        # println(mean([mean(k) for k in grad]))
+
         update!(dparams, grad, opts)
+
         return loss
     end
 
@@ -96,17 +88,15 @@ function traingan(zsize, atype, metric, clip)
 
         if metric == "wgan"
             grad, loss = wganGgradloss(gparams, dparams, gmoments, dmoments, gforw, dforw, z, leak)
+            # gradcheck(wganGloss, gparams, dparams, gmoments, dmoments, gforw, dforw, z, leak, atol=0.01, verbose=true)
         elseif metric == "gan"
             grad, loss = ganGgradloss(gparams, dparams, gmoments, dmoments, gforw, dforw, z, positive, leak)
         else
             throw(ArgumentError("Unknown metric"))
         end
-        # println("G Grad")
-        #gtemp = deepcopy(gparams)
-        #println(length(gparams), length(grad))
-        # println(mean([mean(k) for k in grad]))
+
         update!(gparams, grad, opts)
-        #println([mean(abs.(k)) for k in gtemp-gparams])
+
         return loss
     end
 

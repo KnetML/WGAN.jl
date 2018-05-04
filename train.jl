@@ -1,6 +1,7 @@
 include("models.jl")
 include("utils.jl")
 include("loss.jl")
+include("pyprocess.jl")
 using Knet, ArgParse, FileIO, Images
 
 function main(args)
@@ -12,7 +13,7 @@ function main(args)
         ("--dn"; arg_type=Int; default=1; help="Train discriminator n times")
         ("--type"; arg_type=String; default="dcganbn"; help="Type of model one of: [dcganbn (regular DCGAN), mlpg (Generator is MLP),
         mlpgd (Both MLP), dcgan (Generator has no BN and has constant filter size)]")
-        ("--data"; arg_type=String; default="/home/cem/bedroom"; help="Dataset dir (processed)")
+        ("--data"; arg_type=String; default="/home/cem/lsun"; help="Dataset dir (lmdb)")
         ("--procedure"; arg_type=String; default="gan"; help="Training procedure. gan or wgan")
         ("--zsize"; arg_type=Int; default=100; help="Noise vector dimension")
         ("--epochs"; arg_type=Int; default=20; help="Number of training epochs")
@@ -109,66 +110,53 @@ function main(args)
 
     trainD, trainG = traingan(zsize, atype, procedure, o[:clip])
 
-    numchunks = getnumchunks(datadir)
-    myprint("Number of chunks: $numchunks")
+    myprint("Getting data loader...")
+    dataset = getdataset(datadir)
 
     myprint("Started Training...")
     genitertotal = 0
 
     for epoch in 1:numepoch
-        numelements = 0
-        gtotalloss = 0.0
-        dtotalloss = 0.0
-        geniter = 0
+        dataiter = getdataiter(dataset, batchsize)
+        totaliter = length(dataiter)
+        i = 0
 
-        for chunk in 1:30:numchunks
-            upper = min(numchunks, chunk+30-1) # TODO: Read this from sys args
-            myprint("Loading chunks: ($chunk, $upper)")
-            data = loadimgtensors(datadir, (chunk, upper))
-            numelements += size(data, 1)
-            batches = minibatch4(data, batchsize, atype)
-            numexamples = length(batches)
-            myprint("Fitting chunks. Num steps: $numexamples")
-            i = 1
-            while i <= numexamples
+        while i < totaliter
+            if procedure == "wgan"
                 if genitertotal < 25 || genitertotal % 500 == 0
                     Diters = 100
                 else
                     Diters = dn
                 end
 
-                limit = min(i+Diters-1, numexamples)
-                dbatches = batches[i:limit]
-                dloss = 0.0
-
-                for minibatch in dbatches
-                    minibatch = atype(minibatch)
-                    dloss += trainD(dparams, gparams, gmoments, dmoments, gforw, dforw, minibatch, dopt, leak, batchsize)
-                    i += 1
+                j = 0; dloss_real = 0; dloss_fake = 0
+                while j < Diters && i < totaliter
+                    i += 1; j += 1
+                    minibatch = atype(getnext(dataiter))
+                    dloss_real, dloss_fake = trainD(dparams, gparams, gmoments, dmoments, gforw, dforw, minibatch, dopt, leak)
                 end
 
                 gloss = trainG(gparams, dparams, gmoments, dmoments, gforw, dforw, batchsize, gopt, leak)
-                geniter += 1
                 genitertotal += 1
-                gtotalloss += gloss * batchsize
-                dtotalloss += dloss * batchsize
-                appendcsv(logdir, gloss, dloss/length(dbatches))
-           end
+                dloss = dloss_real - dloss_fake
+                appendcsv(logdir, gloss, dloss)
+                myprint("[$epoch/$numepoch][$i/$totaliter], LossD: $dloss, LossG: $gloss, LossD Real: $dloss_real, LossD Fake: $dloss_fake")
+            elseif procedure == "gan"
+                i += 1
+                minibatch = atype(getnext(dataiter))
+                dloss = trainD(dparams, gparams, gmoments, dmoments, gforw, dforw, minibatch, dopt, leak)
+                gloss = trainG(gparams, dparams, gmoments, dmoments, gforw, dforw, batchsize, gopt, leak)
+                appendcsv(logdir, gloss, dloss)
+                myprint("[$epoch/$numepoch][$i/$totaliter], LossD: $dloss, LossG: $gloss")
+            else
+                throw(ArgumentError("Unknown metric"))
+            end
        end
 
-       gtotalloss /= (batchsize*geniter)
-       dtotalloss /= numelements
-       elapsed = 0
-
-       myprint("Epoch $epoch took $elapsed: G Loss: $gtotalloss D Loss: $dtotalloss")
        grid = generateimgs(gforw, gparams, gmoments, zsize, atype)
        outfile = joinpath(outdir, "epoch$epoch.png")
        save(outfile, colorview(RGB, grid))
     end
-
-    grid = generateimgs(gforw, gparams, gmoments, zsize, atype)
-    outfile = "trained.png"
-    save(outfile, colorview(RGB, grid))
 
     myprint("Done. Exiting...")
     return 0
@@ -190,6 +178,6 @@ main(ARGS)
 # ===WGAN: Generator with no batch norm===
 # julia train.jl --gpu 1 --type dcgan --procedure wgan --clip 0.01 --lr 0.00005 --opt rmsprop --dn 5 --epochs 30
 # ===WGAN: Generator MLP===
-# julia train.jl --gpu 2 --type mlpg --procedure wgan --clip 0.01 --lr 0.00005 --opt rmsprop --dn 5 --epochs 30
+# julia train.jl --gpu 0 --type mlpg --procedure wgan --clip 0.01 --lr 0.00005 --opt rmsprop --dn 5 --epochs 40
 # ===WGAN: Both MLP===
 # julia train.jl --gpu 3 --type mlpgd --procedure wgan --clip 0.01 --lr 0.00005 --opt rmsprop --dn 5 --epochs 30
