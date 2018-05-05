@@ -27,6 +27,12 @@ function wganDloss(dparams, dmoments, dforw, input, leak)
     return mean(clss)
 end
 
+function wganDloss2(dparams, dmoments, dforw, real, fake, leak)
+    realclss = dforw(dparams, dmoments, real, leak)
+    fakeclss = dforw(dparams, dmoments, fake, leak)
+    return -(mean(realclss) - mean(fakeclss))
+end
+
 function ganGloss(gparams, dparams, gmoments, dmoments, gforw, dforw, z, positive, leak)
     fakeimg = gforw(gparams, gmoments, z)
     fakeclss = mat(dforw(dparams, dmoments, fakeimg, leak))
@@ -35,8 +41,8 @@ end
 
 function wganGloss(gparams, dparams, gmoments, dmoments, gforw, dforw, z, leak)
     fakeimg = gforw(gparams, gmoments, z)
-    fakeclss = mat(dforw(dparams, dmoments, fakeimg, leak))
-    return mean(fakeclss)
+    fakeclss = dforw(dparams, dmoments, fakeimg, leak)
+    return -mean(fakeclss)
 end
 
 # Gradient functions
@@ -44,6 +50,7 @@ ganGgradloss = gradloss(ganGloss)
 ganDgradloss = gradloss(ganDloss)
 wganGgradloss = gradloss(wganGloss)
 wganDgradloss = gradloss(wganDloss)
+wganDgradloss2 = gradloss(wganDloss2) # 2 means combining both losses
 
 function traingan(zsize, atype, metric, clip)
     """
@@ -64,11 +71,8 @@ function traingan(zsize, atype, metric, clip)
             for i = 1:length(dparams)
                 dparams[i] = clipfun(dparams[i], -clip, clip)
             end
-            grad_real, loss_real = wganDgradloss(dparams, dmoments, dforw, x, leak)
-            grad_fake, loss_fake = wganDgradloss(dparams, dmoments, dforw, generated, leak)
-            grad = grad_real - grad_fake
+            grad, loss = wganDgradloss2(dparams, dmoments, dforw, x, generated, leak)
             # gradcheck(wganDloss, dparams, dmoments, dforw, generated, x, leak, atol=0.1, verbose=true, gcheck=100)
-            loss = loss_real, loss_fake
         elseif metric == "gan"
             positive = atype(ones(1, batchsize))
             negative = atype(zeros(1, batchsize))

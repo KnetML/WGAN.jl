@@ -4,7 +4,7 @@ include("params.jl")
 using Knet
 
 function myinit(a...)
-    return xavier(a...)
+    return gaussian(a..., mean=0.0, std=0.02)
 end
 
 function dcgeneratorbn(params, moments, x; training=true)
@@ -31,26 +31,15 @@ function dcgenerator(params, moments, x; training=true)
     return dcGout(params[5], x)
 end
 
-function dcdiscriminatorbn(params, moments, x, leak; training=true)
+function dcdiscriminator(params, moments, x, leak; training=true)
     """
     Deep Convolutional Discriminator with Batchnorm
     """
-    x = dcD_in(params[1], x, leak)
+    x = dcDin(params[1], x, leak)
     x = dcD(params[2:3], moments[1], x, leak, training)
     x = dcD(params[4:5], moments[2], x, leak, training)
     x = dcD(params[6:7], moments[3], x, leak, training)
     return dcDout(params[8], x)
-end
-
-function dcdiscriminator(params, moments, x, leak; training=true)
-    """
-    Deep Convolutional Discriminator
-    """
-    x = dcD_in(params[1], x, leak)
-    x = dcD_nobn(params[2], x, leak)
-    x = dcD_nobn(params[3], x, leak)
-    x = dcD_nobn(params[4], x, leak)
-    return dcDout(params[5], x)
 end
 
 function mlpgenerator(params, moments, x; training=true)
@@ -60,14 +49,11 @@ function mlpgenerator(params, moments, x; training=true)
     in a generic way. Input is 4D (1,1,zsize,N) squeeze it
     """
     batchsize = size(x, 4)
-    zsize = size(x, 3)
-
     x = mat(x)
     x = mlp(params[1:2], x)
     x = mlp(params[3:4], x)
     x = mlp(params[5:6], x)
-    x = mlpoutG(params[7:8], x)
-    # Output should be an image
+    x = mlpout(params[7:8], x)
     return reshape(x, 64, 64, 3, batchsize)
 end
 
@@ -81,7 +67,7 @@ function mlpdiscriminator(params, moments, x, leak; training=true)
     x = mlp(params[1:2], x)
     x = mlp(params[3:4], x)
     x = mlp(params[5:6], x)
-    return mlpoutD(params[7:8], x)
+    return mlpout(params[7:8], x)
 end
 
 # Below G and D are connected
@@ -92,7 +78,7 @@ function dcganbnorm(leak, zsize, atype; winit=myinit)
     """
     gparams, gmoments = dcGinitbn(atype, winit, zsize)
     dparams, dmoments = dcDinitbn(atype, winit)
-    return (gparams, gmoments, dcgeneratorbn), (dparams, dmoments, dcdiscriminatorbn)
+    return (gparams, gmoments, dcgeneratorbn), (dparams, dmoments, dcdiscriminator)
 end
 
 function dcgan(leak, zsize, atype; winit=myinit)
@@ -101,7 +87,7 @@ function dcgan(leak, zsize, atype; winit=myinit)
     """
     gparams = dcGinit(atype, winit, 64, zsize)
     dparams, dmoments = dcDinitbn(atype, winit)
-    return (gparams, [], dcgenerator), (dparams, dmoments, dcdiscriminatorbn)
+    return (gparams, [], dcgenerator), (dparams, dmoments, dcdiscriminator)
 end
 
 function mlpg(leak, zsize, atype; winit=myinit)
@@ -110,7 +96,7 @@ function mlpg(leak, zsize, atype; winit=myinit)
     """
     gparams = mlpGinit(atype, 512, zsize)
     dparams, dmoments = dcDinitbn(atype, winit)
-    return (gparams, nothing, mlpgenerator), (dparams, dmoments, dcdiscriminatorbn)
+    return (gparams, [], mlpgenerator), (dparams, dmoments, dcdiscriminator)
 end
 
 function mlpgd(leak, zsize, atype; winit=myinit)

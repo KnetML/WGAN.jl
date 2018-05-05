@@ -46,6 +46,7 @@ function main(args)
     lr = o[:lr]
     datadir = o[:data]
     dn = o[:dn]
+    report = o[:report]
 
     myprint("Minibatch Size: $batchsize")
     myprint("Training Procedure: $procedure")
@@ -55,7 +56,7 @@ function main(args)
     myprint("Using $optimizer with learning rate $lr")
     myprint("Dataset directory: $datadir")
     myprint("Training discriminator $dn times")
-
+    myprint("Report steps: $report")
     myprint("Using GPU $gpuid")
 
     outdir = joinpath(o[:out], modeltype)
@@ -133,21 +134,24 @@ function main(args)
                 while j < Diters && i < totaliter
                     i += 1; j += 1
                     minibatch = atype(getnext(dataiter))
-                    dloss_real, dloss_fake = trainD(dparams, gparams, gmoments, dmoments, gforw, dforw, minibatch, dopt, leak)
+                    dloss = trainD(dparams, gparams, gmoments, dmoments, gforw, dforw, minibatch, dopt, leak)
                 end
 
                 gloss = trainG(gparams, dparams, gmoments, dmoments, gforw, dforw, batchsize, gopt, leak)
                 genitertotal += 1
-                dloss = dloss_real - dloss_fake
                 appendcsv(logdir, gloss, dloss)
-                myprint("[$epoch/$numepoch][$i/$totaliter], LossD: $dloss, LossG: $gloss, LossD Real: $dloss_real, LossD Fake: $dloss_fake")
+                if i % report == 0
+                    myprint("[$epoch/$numepoch][$i/$totaliter], LossD: $dloss, LossG: $gloss, LossD Real: $dloss_real, LossD Fake: $dloss_fake")
+                end
             elseif procedure == "gan"
                 i += 1
                 minibatch = atype(getnext(dataiter))
                 dloss = trainD(dparams, gparams, gmoments, dmoments, gforw, dforw, minibatch, dopt, leak)
                 gloss = trainG(gparams, dparams, gmoments, dmoments, gforw, dforw, batchsize, gopt, leak)
                 appendcsv(logdir, gloss, dloss)
-                myprint("[$epoch/$numepoch][$i/$totaliter], LossD: $dloss, LossG: $gloss")
+                if i % report == 0
+                    myprint("[$epoch/$numepoch][$i/$totaliter], LossD: $dloss, LossG: $gloss")
+                end
             else
                 throw(ArgumentError("Unknown metric"))
             end

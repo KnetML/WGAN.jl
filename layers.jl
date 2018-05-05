@@ -20,7 +20,7 @@ end
 
 # Deep Convolutional Discriminator
 # Input does not have batchnorm
-function dcD_in(w, x, leak)
+function dcDin(w, x, leak)
     x = conv4(w, x, stride=2, padding=1, mode=1)
     return leakyrelu.(x, leak)
 end
@@ -31,13 +31,8 @@ function dcD(w, m, x, leak, training)
     return leakyrelu.(x, leak)
 end
 
-function dcD_nobn(w, x, leak)
-    x = conv4(w, x, stride=2, padding=1, mode=1)
-    return leakyrelu.(x, leak)
-end
-
 function dcDout(w, x)
-    return conv4(w, x, mode=1, mode=1)
+    return conv4(w, x, mode=1)
 end
 
 # Deep Convolutional Generator with no batchnorm
@@ -61,13 +56,8 @@ function mlp(w, x)
     return relu.(w[1] * x .+ w[2])
 end
 
-# Discriminator MLP output layer
-function mlpoutD(w, x)
-    return w[1] * x .+ w[2]
-end
-
-# Generator MLP output layer
-function mlpoutG(w, x)
+# Common MLP output layer
+function mlpout(w, x)
     return w[1] * x .+ w[2]
 end
 

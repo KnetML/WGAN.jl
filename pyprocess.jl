@@ -31,9 +31,3 @@ function tojlarr(tensor)
     jltensor = permutedims(jltensor, [2,3,4,1]) # Batch last
     return jltensor
 end
-
-# dataset = getdataset("/home/cem/lsun")
-# dataiter = getdataiter(dataset, 64)
-# println(length(dataiter))
-# b = tojlarr(pybuiltin(:next)(dataiter))
-# saveimgs(b[:,:,:,1:16] .+ 0.5)
