@@ -1,5 +1,4 @@
 *.DS_Store
-*.png
 *.log
 *.out
 models/*
