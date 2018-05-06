@@ -25,8 +25,7 @@ optional arguments:
                         DCGAN), mlpg (Generator is MLP),         mlpgd
                         (Both MLP), dcgan (Generator has no BN and has
                         constant filter size)] (default: "dcganbn")
-  --data DATA           Dataset dir (processed) (default:
-                        "/home/cem/bedroom")
+  --data DATA           Dataset dir (lmdb) (default: "/home/cem/lsun")
   --procedure PROCEDURE
                         Training procedure. gan or wgan (default:
                         "gan")
@@ -44,10 +43,9 @@ optional arguments:
                         "adam")
   --leak LEAK           LeakyReLU leak. (type: Float64, default: 0.2)
   --out OUT             Output directory for saving model and
-                        generating images (default:
-                        "/home/cem/WGAN.jl/models")
+                        generating images (default: "./models")
   -h, --help            show this help message and exit
-  ```
+```
   
   ## Learning Curves and Outputs
   
