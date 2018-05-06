@@ -50,5 +50,7 @@ optional arguments:
   ## Learning Curves and Outputs
   
   ### Standard GAN
+  ![alt text](imgs/jsd_withimage.png)
   
   ### Wasserstein GAN
+  ![alt text](imgs/wasserstein_withimage.png)
