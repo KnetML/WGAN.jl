@@ -5,7 +5,7 @@ include("loss.jl")
 include("layers.jl")
 @pyimport pickle
 
-model = mlpg
+model = dcgan
 
 function torch2knet(params)
     i = 1

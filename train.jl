@@ -96,8 +96,8 @@ function main(args)
         gopt = optimizers(gparams, Adam, lr=lr, beta1=0.5)
         dopt = optimizers(dparams, Adam, lr=lr, beta1=0.5)
     elseif optimizer == "rmsprop"
-        gopt = optimizers(gparams, Rmsprop, lr=lr)
-        dopt = optimizers(dparams, Rmsprop, lr=lr)
+        gopt = optimizers(gparams, Rmsprop, lr=lr, rho=0.99, eps=1e-8)
+        dopt = optimizers(dparams, Rmsprop, lr=lr, rho=0.99, eps=1e-8)
     else:
         throw(ArgumentError("Unknown optimizer"))
     end
@@ -130,30 +130,26 @@ function main(args)
                     Diters = dn
                 end
 
-                j = 0; dloss_real = 0; dloss_fake = 0
+                j = 0;
                 while j < Diters && i < totaliter
                     i += 1; j += 1
                     minibatch = atype(getnext(dataiter))
                     dloss = trainD(dparams, gparams, gmoments, dmoments, gforw, dforw, minibatch, dopt, leak)
                 end
 
-                gloss = trainG(gparams, dparams, gmoments, dmoments, gforw, dforw, batchsize, gopt, leak)
-                genitertotal += 1
-                appendcsv(logdir, gloss, dloss)
-                if i % report == 0
-                    myprint("[$epoch/$numepoch][$i/$totaliter], LossD: $dloss, LossG: $gloss, LossD Real: $dloss_real, LossD Fake: $dloss_fake")
-                end
             elseif procedure == "gan"
                 i += 1
                 minibatch = atype(getnext(dataiter))
                 dloss = trainD(dparams, gparams, gmoments, dmoments, gforw, dforw, minibatch, dopt, leak)
-                gloss = trainG(gparams, dparams, gmoments, dmoments, gforw, dforw, batchsize, gopt, leak)
-                appendcsv(logdir, gloss, dloss)
-                if i % report == 0
-                    myprint("[$epoch/$numepoch][$i/$totaliter], LossD: $dloss, LossG: $gloss")
-                end
             else
                 throw(ArgumentError("Unknown metric"))
+            end
+
+            gloss = trainG(gparams, dparams, gmoments, dmoments, gforw, dforw, batchsize, gopt, leak)
+            genitertotal += 1
+            appendcsv(logdir, gloss, dloss)
+            if i % report == 0
+                myprint("[$epoch/$numepoch][$i/$totaliter], LossD: $dloss, LossG: $gloss")
             end
        end
 
