@@ -48,7 +48,7 @@ optional arguments:
 ```
   
   ## Learning Curves and Outputs
-  
+  Images below are the plots of the outputs of the implementation in this repo. Original outputs can be found [here](https://github.com/martinarjovsky/WassersteinGAN)
   ### Standard GAN
   ![alt text](imgs/jsd_withimage.png)
   
